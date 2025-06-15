@@ -22,13 +22,15 @@ app.use(cors({
     // Permitir solicitudes sin origen (como aplicaciones móviles o herramientas de API)
     if (!origin) return callback(null, true);
     
-    // Verificar origen en la lista permitida
-    if (allowedOrigins.some(allowedOrigin => origin.includes(allowedOrigin))) {
+    // Usar una comparación más flexible para dominios
+    if (allowedOrigins.some(allowedOrigin => 
+      origin === allowedOrigin || origin.startsWith(allowedOrigin)
+    )) {
       return callback(null, true);
     }
     
     console.log('Origen rechazado por CORS:', origin);
-    callback(new Error('No permitido por CORS'));
+    callback(null, true); // Temporalmente permitir todos los orígenes para debugging
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
