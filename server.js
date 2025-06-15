@@ -8,10 +8,29 @@ const { errorHandler } = require('./middleware/errorHandler');
 
 const app = express();
 
+const allowedOrigins = [
+  'https://minicv.univerdad.me',     // Tu dominio personalizado
+  'http://localhost:3000',  // Para desarrollo local
+  'https://minicv-frontend.vercel.app', // Dominio de Vercel    
+  'https://www.mercadopago.com.ar',  // Para webhooks de MercadoPago
+  'https://www.mercadopago.com.co'   // Para webhooks de MercadoPago Colombia
+];
+
 // Middleware CORS
 app.use(cors({
-  origin: [process.env.FRONTEND_URL || 'http://localhost:3000', 'https://www.mercadopago.com.ar'],
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  origin: function(origin, callback) {
+    // Permitir solicitudes sin origen (como aplicaciones móviles o herramientas de API)
+    if (!origin) return callback(null, true);
+    
+    // Verificar origen en la lista permitida
+    if (allowedOrigins.some(allowedOrigin => origin.includes(allowedOrigin))) {
+      return callback(null, true);
+    }
+    
+    console.log('Origen rechazado por CORS:', origin);
+    callback(new Error('No permitido por CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
