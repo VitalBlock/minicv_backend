@@ -149,6 +149,40 @@ exports.checkUserPayment = async (req, res) => {
   }
 };
 
+// Verificar pago de usuario sin especificar template
+exports.checkUserPaymentGeneral = async (req, res) => {
+  try {
+    const sessionId = req.cookies.sessionId;
+    
+    if (!sessionId) {
+      return res.status(200).json({ hasPaid: false });
+    }
+    
+    // Buscar cualquier pago aprobado con descargas disponibles
+    const payment = await Payment.findOne({
+      where: {
+        sessionId: sessionId,
+        status: 'approved',
+        downloadsRemaining: { [sequelize.Op.gt]: 0 }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+    
+    return res.status(200).json({
+      hasPaid: !!payment,
+      downloadsRemaining: payment ? payment.downloadsRemaining : 0,
+      template: payment ? payment.template : null,
+      paymentInfo: payment ? {
+        id: payment.mercadoPagoId,
+        date: payment.updatedAt
+      } : null
+    });
+  } catch (error) {
+    logger.error('Error al verificar pago general de usuario', error);
+    return res.status(500).json({ error: 'Error al verificar pago' });
+  }
+};
+
 // Nuevo endpoint para registrar una descarga
 exports.registerDownload = async (req, res) => {
   try {
@@ -276,4 +310,29 @@ exports.getPublicKey = async (req, res) => {
   return res.status(200).json({ 
     publicKey: config.mercadoPago.publicKey
   });
+};
+
+// Inicializar sesión para usuario
+exports.initializeSession = async (req, res) => {
+  try {
+    // Generar un ID de sesión nuevo si no existe
+    const sessionId = req.cookies.sessionId || uuidv4();
+    
+    // Establecer cookie de sesión
+    res.cookie('sessionId', sessionId, { 
+      maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
+      httpOnly: true,
+      secure: config.nodeEnv === 'production',
+      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax'
+    });
+    
+    return res.status(200).json({ 
+      success: true, 
+      sessionId,
+      message: 'Sesión inicializada correctamente'
+    });
+  } catch (error) {
+    logger.error('Error al inicializar sesión', error);
+    return res.status(500).json({ error: 'Error al inicializar sesión' });
+  }
 };
