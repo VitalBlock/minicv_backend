@@ -67,10 +67,32 @@ exports.createPreference = async (req, res) => {
     
     // No hay descargas disponibles, crear nueva preferencia de pago
     let priceInteger = parseInt(price);
-    const expectedPrice = process.env.NODE_ENV === 'production' ? 750 : 5;
+    let expectedPrice;
+    
+    // Validar según el template
+    switch (template) {
+      case 'professional':
+        expectedPrice = 3000;
+        break;
+      case 'modern':
+      case 'creative':
+        expectedPrice = 5000;
+        break;
+      default:
+        expectedPrice = 3000; // Valor por defecto
+    }
+    
+    // En desarrollo, usar un precio bajo para pruebas
+    if (process.env.NODE_ENV !== 'production') {
+      expectedPrice = 5;
+    }
     
     if (priceInteger !== expectedPrice) {
-      logger.warn('Precio incorrecto recibido', { received: priceInteger, expected: expectedPrice });
+      logger.warn('Precio incorrecto para template', { 
+        template, 
+        received: priceInteger, 
+        expected: expectedPrice 
+      });
       priceInteger = expectedPrice;
     }
     
