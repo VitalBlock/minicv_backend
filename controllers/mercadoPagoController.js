@@ -3,6 +3,7 @@ const logger = require('../utils/logger');
 const Payment = require('../models/Payment');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
+const { sequelize } = require('../config/database');
 
 // Configuración de MercadoPago
 mercadopago.configure({
@@ -250,4 +251,29 @@ exports.handleWebhook = async (req, res) => {
     logger.error('Error en webhook', error);
     res.status(500).send('Internal Server Error');
   }
+};
+
+// Verificar el estado de un pago
+exports.checkPayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const paymentInfo = await mercadopago.payment.findById(id);
+    
+    if (!paymentInfo || !paymentInfo.body) {
+      return res.status(404).json({ error: 'Pago no encontrado' });
+    }
+    
+    return res.status(200).json(paymentInfo.body);
+  } catch (error) {
+    logger.error('Error al verificar estado del pago', error);
+    return res.status(500).json({ error: 'Error al verificar el pago' });
+  }
+};
+
+// Obtener la clave pública
+exports.getPublicKey = async (req, res) => {
+  return res.status(200).json({ 
+    publicKey: config.mercadoPago.publicKey
+  });
 };
