@@ -1,149 +1,253 @@
-const mercadopago = require('../config/mercadopago');
+const mercadopago = require('mercadopago');
 const logger = require('../utils/logger');
+const Payment = require('../models/Payment');
+const { v4: uuidv4 } = require('uuid');
+const config = require('../config');
 
-/**
- * Crea una preferencia de pago en MercadoPago
- */
+// Configuración de MercadoPago
+mercadopago.configure({
+  access_token: config.mercadoPago.accessToken
+});
+
+// Crear preferencia de pago
 exports.createPreference = async (req, res) => {
-    try {
-        const { title, price, quantity, template } = req.body;
-        
-        logger.info('Creando preferencia de pago', { title, price, quantity, template });
-        
-        // Validar datos
-        if (!price || isNaN(parseFloat(price)) || parseFloat(price) <= 0) {
-            return res.status(400).json({ error: 'Precio inválido' });
-        }
-        
-        // En Colombia, MercadoPago espera el precio en enteros (sin centavos)
-        // Los precios ya vienen como enteros (3000 o 5000)
-        let priceInteger = parseInt(price);
-        
-        // Comprobar que el precio sea correcto según la plantilla
-        const expectedPrice = template === 'professional' ? 3000 : 5000;
-        if (priceInteger !== expectedPrice) {
-            logger.warn('Precio incorrecto para la plantilla', { 
-                template, 
-                receivedPrice: priceInteger, 
-                expectedPrice 
-            });
-            // Usar el precio esperado para evitar manipulaciones
-            priceInteger = expectedPrice;
-        }
-        
-        const preference = {
-            items: [
-                {
-                    id: "cv-premium-" + Date.now(),
-                    title: title || 'CV Premium sin marca de agua',
-                    description: template === 'professional' 
-                        ? 'CV Premium Profesional ATS' 
-                        : 'CV Premium con diseño personalizado',
-                    picture_url: "https://www.minicv.com/assets/cv-preview.png",
-                    category_id: "digital_goods",
-                    unit_price: priceInteger,
-                    quantity: parseInt(quantity) || 1,
-                    currency_id: "COP" // Moneda de Colombia
-                }
-            ],
-            back_urls: {
-                success: `${process.env.FRONTEND_URL}/payment/mercadopago/success`,
-                failure: `${process.env.FRONTEND_URL}/payment/mercadopago/failure`,
-                pending: `${process.env.FRONTEND_URL}/payment/mercadopago/pending`
-            },
-            external_reference: template || 'professional'
-        };
-        
-        logger.info('Enviando preferencia a MercadoPago', preference);
-        
-        const response = await mercadopago.preferences.create(preference);
-        
-        logger.info('Respuesta de MercadoPago', { 
-            id: response.body.id,
-            init_point: response.body.init_point
-        });
-        
-        return res.status(200).json({
-            id: response.body.id,
-            init_point: response.body.init_point,
-            sandbox_init_point: response.body.sandbox_init_point
-        });
-    } catch (error) {
-        logger.error('Error al crear preferencia', error);
-        return res.status(500).json({ 
-            error: 'Error al crear la preferencia de pago',
-            details: error.message
-        });
+  try {
+    const { title, price, quantity, template } = req.body;
+    
+    logger.info('Creando preferencia de pago', { title, price, quantity, template });
+    
+    // Validar datos
+    if (!title || !price || !quantity) {
+      return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
+    
+    // Obtener ID de sesión
+    const sessionId = req.cookies.sessionId || uuidv4();
+    
+    // Si no hay cookie de sesión, establecerla
+    if (!req.cookies.sessionId) {
+      res.cookie('sessionId', sessionId, { 
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
+        httpOnly: true,
+        secure: config.nodeEnv === 'production',
+        sameSite: config.nodeEnv === 'production' ? 'none' : 'lax'
+      });
+    }
+    
+    // Verificar si ya existe un pago aprobado con descargas disponibles
+    const existingPayment = await Payment.findOne({
+      where: {
+        sessionId: sessionId,
+        template: template,
+        status: 'approved',
+        downloadsRemaining: { [sequelize.Op.gt]: 0 }
+      }
+    });
+    
+    if (existingPayment) {
+      logger.info('Usuario tiene descargas disponibles', { 
+        sessionId, 
+        template, 
+        downloads: existingPayment.downloadsRemaining 
+      });
+      
+      return res.status(200).json({ 
+        message: 'Tienes descargas disponibles',
+        hasPaid: true,
+        paymentId: existingPayment.mercadoPagoId,
+        downloadsRemaining: existingPayment.downloadsRemaining
+      });
+    }
+    
+    // No hay descargas disponibles, crear nueva preferencia de pago
+    let priceInteger = parseInt(price);
+    const expectedPrice = process.env.NODE_ENV === 'production' ? 750 : 5;
+    
+    if (priceInteger !== expectedPrice) {
+      logger.warn('Precio incorrecto recibido', { received: priceInteger, expected: expectedPrice });
+      priceInteger = expectedPrice;
+    }
+    
+    // Referencia externa para identificar sesión y template
+    const externalReference = `${sessionId}-${template}`;
+    
+    // Crear preferencia de pago
+    const preference = {
+      items: [{
+        title: title,
+        unit_price: priceInteger,
+        quantity: parseInt(quantity)
+      }],
+      external_reference: externalReference,
+      back_urls: {
+        success: `${config.frontendUrl}/success`,
+        failure: `${config.frontendUrl}/failure`,
+        pending: `${config.frontendUrl}/pending`
+      },
+      auto_return: 'approved',
+      notification_url: `${config.backendUrl}/api/mercadopago/webhook`
+    };
+    
+    // Crear preferencia en MercadoPago
+    const response = await mercadopago.preferences.create(preference);
+    
+    // Crear registro de pago pendiente
+    await Payment.create({
+      sessionId: sessionId,
+      mercadoPagoId: response.body.id,
+      amount: priceInteger,
+      status: 'pending',
+      template: template,
+      downloadsRemaining: 5 // 5 descargas por defecto
+    });
+    
+    logger.info('Preferencia creada exitosamente', { id: response.body.id });
+    
+    // Retornar la preferencia
+    return res.status(201).json(response.body);
+  } catch (error) {
+    logger.error('Error al crear preferencia', error);
+    return res.status(500).json({ 
+      error: 'Error al crear la preferencia de pago',
+      details: error.message
+    });
+  }
 };
 
-/**
- * Verifica el estado de un pago
- */
-exports.checkPayment = async (req, res) => {
-    try {
-        const { paymentId } = req.params;
-        
-        if (!paymentId) {
-            return res.status(400).json({ error: 'ID de pago requerido' });
-        }
-        
-        logger.info(`Verificando estado del pago: ${paymentId}`);
-        
-        const response = await mercadopago.payment.get(paymentId);
-        
-        logger.info(`Estado del pago: ${response.body.status}`, {
-            payment_id: paymentId,
-            status: response.body.status
-        });
-        
-        res.status(200).json({
-            status: response.body.status,
-            status_detail: response.body.status_detail,
-            external_reference: response.body.external_reference
-        });
-    } catch (error) {
-        logger.error(`Error al verificar pago: ${req.params.paymentId}`, error);
-        res.status(500).json({ 
-            error: 'Error al verificar el estado del pago',
-            details: error.message
-        });
+// Nuevo endpoint para verificar el estado de descargas
+exports.checkUserPayment = async (req, res) => {
+  try {
+    const { template } = req.params;
+    const sessionId = req.cookies.sessionId;
+    
+    if (!sessionId) {
+      return res.status(200).json({ hasPaid: false });
     }
+    
+    // Buscar pago aprobado con descargas disponibles
+    const payment = await Payment.findOne({
+      where: {
+        sessionId: sessionId,
+        template: template,
+        status: 'approved',
+        downloadsRemaining: { [sequelize.Op.gt]: 0 }
+      }
+    });
+    
+    return res.status(200).json({
+      hasPaid: !!payment,
+      downloadsRemaining: payment ? payment.downloadsRemaining : 0,
+      paymentInfo: payment ? {
+        id: payment.mercadoPagoId,
+        date: payment.updatedAt
+      } : null
+    });
+  } catch (error) {
+    logger.error('Error al verificar pago de usuario', error);
+    return res.status(500).json({ error: 'Error al verificar pago' });
+  }
 };
 
-/**
- * Maneja las notificaciones (webhooks) de MercadoPago
- */
+// Nuevo endpoint para registrar una descarga
+exports.registerDownload = async (req, res) => {
+  try {
+    const { template } = req.params;
+    const sessionId = req.cookies.sessionId;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'No hay sesión activa' });
+    }
+    
+    // Buscar el pago más reciente con descargas disponibles
+    const payment = await Payment.findOne({
+      where: {
+        sessionId: sessionId,
+        template: template,
+        status: 'approved',
+        downloadsRemaining: { [sequelize.Op.gt]: 0 }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+    
+    if (!payment) {
+      return res.status(400).json({ 
+        error: 'No hay descargas disponibles',
+        requiresPayment: true
+      });
+    }
+    
+    // Decrementar contador de descargas
+    payment.downloadsRemaining -= 1;
+    await payment.save();
+    
+    logger.info('Descarga registrada', { 
+      sessionId, 
+      template, 
+      remainingDownloads: payment.downloadsRemaining 
+    });
+    
+    return res.status(200).json({
+      success: true,
+      downloadsRemaining: payment.downloadsRemaining
+    });
+  } catch (error) {
+    logger.error('Error al registrar descarga', error);
+    return res.status(500).json({ error: 'Error al registrar descarga' });
+  }
+};
+
+// Actualizar el webhook para guardar el estado del pago
 exports.handleWebhook = async (req, res) => {
-    try {
-        const { type, data } = req.body;
+  try {
+    const { id, topic } = req.query;
+    
+    logger.info('Webhook recibido', { id, topic });
+    
+    if (topic === 'payment') {
+      const paymentInfo = await mercadopago.payment.findById(id);
+      
+      if (!paymentInfo || !paymentInfo.body) {
+        return res.status(404).send('Payment not found');
+      }
+      
+      const payment = paymentInfo.body;
+      const externalReference = payment.external_reference;
+      
+      if (externalReference) {
+        const [sessionId, template] = externalReference.split('-');
         
-        logger.info('Webhook recibido', { type, data });
+        // Buscar o crear el registro de pago
+        const [paymentRecord, created] = await Payment.findOrCreate({
+          where: { 
+            mercadoPagoId: payment.id.toString()
+          },
+          defaults: {
+            sessionId: sessionId,
+            mercadoPagoId: payment.id.toString(),
+            amount: payment.transaction_amount,
+            status: payment.status,
+            template: template,
+            downloadsRemaining: 5 // 5 descargas por defecto
+          }
+        });
         
-        // Si es una notificación de pago
-        if (type === 'payment') {
-            const paymentId = data.id;
-            
-            // Obtener detalles del pago
-            const paymentInfo = await mercadopago.payment.get(paymentId);
-            const status = paymentInfo.body.status;
-            
-            logger.info(`Pago ${paymentId} con estado: ${status}`);
-            
-            // Aquí puedes implementar lógica adicional según el estado del pago
-            // Por ejemplo, actualizar una base de datos, enviar emails, etc.
+        if (!created) {
+          // Actualizar el registro existente
+          paymentRecord.status = payment.status;
+          await paymentRecord.save();
         }
         
-        // Siempre responder con 200 OK para que MercadoPago no reintente
-        res.status(200).send('OK');
-    } catch (error) {
-        logger.error('Error al procesar webhook', error);
-        // Aún con error, responder 200 para evitar reintentos
-        res.status(200).send('Error processed');
+        logger.info('Pago actualizado vía webhook', { 
+          id: payment.id, 
+          status: payment.status,
+          downloads: paymentRecord.downloadsRemaining
+        });
+      }
     }
-};
-
-// Añade esta función al controlador
-exports.getPublicKey = (req, res) => {
-    res.json({ publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY });
+    
+    res.status(200).send('OK');
+  } catch (error) {
+    logger.error('Error en webhook', error);
+    res.status(500).send('Internal Server Error');
+  }
 };
