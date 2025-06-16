@@ -78,6 +78,19 @@ exports.createPreference = async (req, res) => {
       case 'creative':
         expectedPrice = 5000;
         break;
+      case 'minimalist':
+        expectedPrice = 3000;
+        break;
+      case 'chronological':
+        expectedPrice = 5000;
+        break;
+      case 'executive':
+        expectedPrice = 7500;
+        break;
+      case 'international':
+      case 'academic':
+        expectedPrice = 6000;
+        break;
       default:
         expectedPrice = 3000; // Valor por defecto
     }
