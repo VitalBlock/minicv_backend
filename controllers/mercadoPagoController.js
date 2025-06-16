@@ -3,7 +3,8 @@ const logger = require('../utils/logger');
 const Payment = require('../models/Payment');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
-const { sequelize } = require('../config/database');
+const { sequelize, Sequelize } = require('../config/database');
+const { Op } = Sequelize;
 
 // Configuración de MercadoPago
 mercadopago.configure({
