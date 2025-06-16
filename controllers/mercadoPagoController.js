@@ -42,7 +42,7 @@ exports.createPreference = async (req, res) => {
         sessionId: sessionId,
         template: template,
         status: 'approved',
-        downloadsRemaining: { [sequelize.Op.gt]: 0 }
+        downloadsRemaining: { [Op.gt]: 0 }
       }
     });
     
@@ -132,7 +132,7 @@ exports.checkUserPayment = async (req, res) => {
         sessionId: sessionId,
         template: template,
         status: 'approved',
-        downloadsRemaining: { [sequelize.Op.gt]: 0 }
+        downloadsRemaining: { [Op.gt]: 0 }
       }
     });
     
@@ -164,7 +164,7 @@ exports.checkUserPaymentGeneral = async (req, res) => {
       where: {
         sessionId: sessionId,
         status: 'approved',
-        downloadsRemaining: { [sequelize.Op.gt]: 0 }
+        downloadsRemaining: { [Op.gt]: 0 }
       },
       order: [['createdAt', 'DESC']]
     });
@@ -200,7 +200,7 @@ exports.registerDownload = async (req, res) => {
         sessionId: sessionId,
         template: template,
         status: 'approved',
-        downloadsRemaining: { [sequelize.Op.gt]: 0 }
+        downloadsRemaining: { [Op.gt]: 0 }
       },
       order: [['createdAt', 'DESC']]
     });
