@@ -6,6 +6,7 @@ const cors = require('cors');
 const routes = require('./routes');
 const { errorHandler } = require('./middleware/errorHandler');
 const cookieParser = require('cookie-parser');
+const { sequelize } = require('./config/database');
 
 const app = express();
 
@@ -57,6 +58,16 @@ app.use('/api', routes);
 
 // Middleware de manejo de errores
 app.use(errorHandler);
+
+// Sincronizar modelos con la base de datos
+(async () => {
+  try {
+    await sequelize.sync();
+    console.log('Modelos sincronizados con la base de datos');
+  } catch (error) {
+    console.error('Error al sincronizar modelos:', error);
+  }
+})();
 
 const PORT = process.env.PORT || 4242;
 app.listen(PORT, () => {

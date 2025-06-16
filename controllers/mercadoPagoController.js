@@ -1,10 +1,11 @@
+// Importación correcta al inicio
 const mercadopago = require('mercadopago');
 const logger = require('../utils/logger');
 const Payment = require('../models/Payment');
 const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
-const { sequelize, Sequelize } = require('../config/database');
-const { Op } = Sequelize;
+const { sequelize } = require('../config/database');
+const { Op } = require('sequelize'); // Cambia esto
 
 // Configuración de MercadoPago
 mercadopago.configure({
@@ -17,6 +18,8 @@ exports.createPreference = async (req, res) => {
     const { title, price, quantity, template } = req.body;
     
     logger.info('Creando preferencia de pago', { title, price, quantity, template });
+    console.log('Datos completos:', req.body);
+    console.log('Cookies:', req.cookies);
     
     // Validar datos
     if (!title || !price || !quantity) {
@@ -42,7 +45,8 @@ exports.createPreference = async (req, res) => {
         sessionId: sessionId,
         template: template,
         status: 'approved',
-        downloadsRemaining: { [Op.gt]: 0 }
+        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
+        // downloadsRemaining: { gt: 0 }
       }
     });
     
@@ -132,7 +136,8 @@ exports.checkUserPayment = async (req, res) => {
         sessionId: sessionId,
         template: template,
         status: 'approved',
-        downloadsRemaining: { [Op.gt]: 0 }
+        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
+        // downloadsRemaining: { gt: 0 }
       }
     });
     
@@ -164,7 +169,8 @@ exports.checkUserPaymentGeneral = async (req, res) => {
       where: {
         sessionId: sessionId,
         status: 'approved',
-        downloadsRemaining: { [Op.gt]: 0 }
+        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
+        // downloadsRemaining: { gt: 0 }
       },
       order: [['createdAt', 'DESC']]
     });
@@ -200,7 +206,8 @@ exports.registerDownload = async (req, res) => {
         sessionId: sessionId,
         template: template,
         status: 'approved',
-        downloadsRemaining: { [Op.gt]: 0 }
+        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
+        // downloadsRemaining: { gt: 0 }
       },
       order: [['createdAt', 'DESC']]
     });
