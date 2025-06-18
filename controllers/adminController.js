@@ -55,7 +55,15 @@ exports.getStatistics = async (req, res) => {
     const totalUsers = await User.count();
     const totalCVs = await UserCV.count();
     const totalPayments = await Payment.count();
-    const totalRevenue = await Payment.sum('amount');
+    
+    // Pagos aprobados y sus ingresos
+    const approvedPayments = await Payment.count({
+      where: { status: 'approved' }
+    });
+    
+    const confirmedRevenue = await Payment.sum('amount', {
+      where: { status: 'approved' }
+    }) || 0;
     
     // Usuarios registrados en los últimos 7 días
     const newUsers = await User.count({
@@ -79,7 +87,9 @@ exports.getStatistics = async (req, res) => {
       totalUsers,
       totalCVs,
       totalPayments,
-      totalRevenue,
+      approvedPayments,
+      confirmedRevenue,
+      totalRevenue: confirmedRevenue, // Para compatibilidad con código existente
       newUsers,
       newCVs
     });
