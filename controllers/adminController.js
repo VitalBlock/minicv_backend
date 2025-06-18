@@ -31,6 +31,17 @@ exports.getAllPayments = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
     
+    // Opcionalmente, podemos añadir información estadística
+    const stats = {
+      total: payments.length,
+      approved: payments.filter(p => p.status === 'approved').length,
+      pending: payments.filter(p => p.status === 'pending').length,
+      rejected: payments.filter(p => p.status === 'rejected').length,
+      totalRevenue: payments
+        .filter(p => p.status === 'approved')
+        .reduce((sum, p) => sum + Number(p.amount), 0)
+    };
+    
     res.json(payments);
   } catch (error) {
     console.error('Error al obtener pagos:', error);
