@@ -17,7 +17,7 @@
     "mercadopago": "^1.5.14",
     "mysql2": "^3.14.1",
     "sequelize": "^6.37.7",
-    "uuid": "^11.1.0"
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "nodemon": "^2.0.22"
