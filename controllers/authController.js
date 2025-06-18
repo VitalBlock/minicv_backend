@@ -129,9 +129,33 @@ exports.login = async (req, res) => {
 
 // Cerrar sesión
 exports.logout = async (req, res) => {
-  res.clearCookie('token');
-  res.clearCookie('sessionId');
-  return res.status(200).json({ message: 'Sesión cerrada correctamente' });
+  try {
+    // Eliminar la cookie del token - usar opciones idénticas a las usadas al crearla
+    res.clearCookie('token', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'  // Asegúrate de que la ruta coincida con la usada al crear la cookie
+    });
+    
+    // También eliminar sessionId si existe
+    res.clearCookie('sessionId', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      path: '/'
+    });
+    
+    // Invalidar la sesión si estás usando sesiones
+    if (req.session) {
+      req.session.destroy();
+    }
+    
+    res.status(200).json({ message: 'Sesión cerrada correctamente' });
+  } catch (error) {
+    console.error('Error al cerrar sesión:', error);
+    res.status(500).json({ error: 'Error al cerrar sesión' });
+  }
 };
 
 // Obtener datos del usuario actual
