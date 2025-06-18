@@ -1,5 +1,5 @@
 // middleware/adminMiddleware.js
-const { User } = require('../models');
+const User = require('../models/User');
 
 exports.isAdmin = async (req, res, next) => {
   try {

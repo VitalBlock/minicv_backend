@@ -1,4 +1,6 @@
-const { User, Payment, UserCV } = require('../models');
+const User = require('../models/User');
+const Payment = require('../models/Payment');
+const UserCV = require('../models/UserCV');
 const { Op } = require('sequelize');
 
 // Obtener todos los usuarios
