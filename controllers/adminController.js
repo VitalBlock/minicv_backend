@@ -77,3 +77,32 @@ exports.getStatistics = async (req, res) => {
     res.status(500).json({ error: 'Error al obtener estadísticas' });
   }
 };
+
+// Cambiar el rol de un usuario
+exports.changeUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+    
+    // Validar que el rol sea válido
+    if (!['admin', 'user'].includes(role)) {
+      return res.status(400).json({ error: 'Rol inválido' });
+    }
+    
+    // Encontrar el usuario
+    const user = await User.findByPk(userId);
+    
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    // Actualizar el rol
+    user.role = role;
+    await user.save();
+    
+    res.json({ message: 'Rol actualizado correctamente', user });
+  } catch (error) {
+    console.error('Error al cambiar rol de usuario:', error);
+    res.status(500).json({ error: 'Error al cambiar rol de usuario' });
+  }
+};

@@ -13,5 +13,7 @@ router.use(isAdmin);
 router.get('/users', adminController.getAllUsers);
 router.get('/payments', adminController.getAllPayments);
 router.get('/statistics', adminController.getStatistics);
+// Cambiar rol de usuario
+router.put('/users/:userId/role', adminController.changeUserRole);
 
 module.exports = router;
