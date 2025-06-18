@@ -9,5 +9,6 @@ router.use('/mercadopago', mercadoPagoRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/auth', require('./authRoutes'));
 router.use('/user-cvs', require('./userCVRoutes'));
+router.use('/admin', require('./adminRoutes'));
 
 module.exports = router;
