@@ -53,8 +53,8 @@ exports.register = async (req, res) => {
     res.cookie('token', token, {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
       httpOnly: true,
-      secure: config.nodeEnv === 'production',
-      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax'
+      secure: true, // Siempre debe ser true cuando sameSite es 'none'
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     });
     
     // Responder con datos del usuario (sin contraseña)
@@ -102,8 +102,8 @@ exports.login = async (req, res) => {
     res.cookie('token', token, {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
       httpOnly: true,
-      secure: config.nodeEnv === 'production',
-      sameSite: config.nodeEnv === 'production' ? 'none' : 'lax'
+      secure: true, // Siempre debe ser true cuando sameSite es 'none'
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     });
     
     // Si hay una sesión activa, asociar los pagos con el usuario
@@ -119,7 +119,8 @@ exports.login = async (req, res) => {
     return res.status(200).json({
       id: user.id,
       name: user.name,
-      email: user.email
+      email: user.email,
+      role: user.role || 'user' // Asegurarse de incluir el rol
     });
   } catch (error) {
     logger.error('Error en login de usuario', error);
