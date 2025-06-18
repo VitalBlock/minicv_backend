@@ -130,6 +130,7 @@ exports.login = async (req, res) => {
 // Cerrar sesión
 exports.logout = async (req, res) => {
   res.clearCookie('token');
+  res.clearCookie('sessionId');
   return res.status(200).json({ message: 'Sesión cerrada correctamente' });
 };
 
