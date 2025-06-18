@@ -62,7 +62,8 @@ app.use(errorHandler);
 // Sincronizar modelos con la base de datos
 (async () => {
   try {
-    await sequelize.sync();
+    // Usar alter:true para modificar tablas existentes sin eliminar datos
+    await sequelize.sync({ alter: true }); 
     console.log('Modelos sincronizados con la base de datos');
   } catch (error) {
     console.error('Error al sincronizar modelos:', error);
@@ -75,5 +76,5 @@ app.listen(PORT, () => {
   console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
 });
-
-module.exports = app; // Para testing
+module.exports = app; // Para testing// src/services/authService.jsconst API_URL = process.env.NODE_ENV === 'production'   ? 'https://minicv-backend.onrender.com/api'  : '/api';export const register = async (name, email, password) => {  const response = await fetch(`${API_URL}/auth/register`, {    method: 'POST',    headers: {      'Content-Type': 'application/json'    },    body: JSON.stringify({ name, email, password }),    credentials: 'include'  });    if (!response.ok) {    const error = await response.json();    throw new Error(error.error || 'Error al registrarse');  }    return await response.json();};export const login = async (email, password) => {  const response = await fetch(`${API_URL}/auth/login`, {    method: 'POST',    headers: {      'Content-Type': 'application/json'    },    body: JSON.stringify({ email, password }),    credentials: 'include'  });    if (!response.ok) {    const error = await response.json();    throw new Error(error.error || 'Error al iniciar sesión');  }    return await response.json();};export const logout = async () => {  const response = await fetch(`${API_URL}/auth/logout`, {    method: 'POST',    credentials: 'include'  });    if (!response.ok) {    const error = await response.json();    throw new Error(error.error || 'Error al cerrar sesión');  }    return await response.json();};export const getCurrentUser = async () => {  try {    const response = await fetch(`${API_URL}/auth/me`, {      credentials: 'include'    });        if (!response.ok) {      if (response.status === 401) {        return null; // No autenticado      }      throw new Error(`Error ${response.status}`);    }        return await response.json();  } catch (error) {    console.error('Error al obtener usuario:', error);    return null;  }
+};

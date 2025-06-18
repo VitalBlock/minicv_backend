@@ -1,5 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
+const User = require('./User'); // Añadir esta línea
 
 const Payment = sequelize.define('Payment', {
   id: {
@@ -8,8 +9,12 @@ const Payment = sequelize.define('Payment', {
     autoIncrement: true
   },
   userId: {
-    type: DataTypes.STRING,
-    allowNull: true
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
   },
   sessionId: {
     type: DataTypes.STRING,
@@ -52,5 +57,11 @@ const Payment = sequelize.define('Payment', {
   tableName: 'payments',
   timestamps: true
 });
+
+// Establecer relación con User si no existe
+if (User) {
+  User.hasMany(Payment, { foreignKey: 'userId' });
+  Payment.belongsTo(User, { foreignKey: 'userId' });
+}
 
 module.exports = Payment;

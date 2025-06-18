@@ -8,5 +8,7 @@ module.exports = {
     accessToken: process.env.MERCADO_PAGO_ACCESS_TOKEN,
     publicKey: process.env.MERCADO_PAGO_PUBLIC_KEY
   },
-  nodeEnv: process.env.NODE_ENV || 'development'
+  nodeEnv: process.env.NODE_ENV || 'development',
+  jwtSecret: process.env.JWT_SECRET || 'b07b4438af33c4a8ed2c9bcc',
+  jwtExpiration: process.env.JWT_EXPIRATION || '1h',
 };

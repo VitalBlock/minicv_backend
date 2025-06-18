@@ -7,5 +7,7 @@ const healthController = require('../controllers/healthController');
 // Otras rutas
 router.use('/mercadopago', mercadoPagoRoutes);
 router.use('/analytics', analyticsRoutes);
+router.use('/auth', require('./authRoutes'));
+router.use('/user-cvs', require('./userCVRoutes'));
 
 module.exports = router;
