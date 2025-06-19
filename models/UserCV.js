@@ -24,6 +24,11 @@ const UserCV = sequelize.define('UserCV', {
   template: {
     type: DataTypes.STRING,
     allowNull: false,
+    validate: {
+      isIn: [['professional', 'modern', 'creative', 'minimalist', 
+              'chronological', 'executive', 'international', 'academic',
+              'mixed', 'functional']] // Añadir nuevas plantillas
+    },
     defaultValue: 'professional'
   },
   cvData: {

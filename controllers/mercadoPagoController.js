@@ -76,6 +76,7 @@ exports.createPreference = async (req, res) => {
         break;
       case 'modern':
       case 'creative':
+      case 'functional': // Añadir plantilla funcional
         expectedPrice = 5000;
         break;
       case 'minimalist':
@@ -89,6 +90,7 @@ exports.createPreference = async (req, res) => {
         break;
       case 'international':
       case 'academic':
+      case 'mixed': // Añadir plantilla mixta
         expectedPrice = 6000;
         break;
       default:

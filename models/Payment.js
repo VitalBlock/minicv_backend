@@ -38,7 +38,12 @@ const Payment = sequelize.define('Payment', {
   },
   template: {
     type: DataTypes.STRING,
-    allowNull: true
+    allowNull: false,
+    validate: {
+      isIn: [['professional', 'modern', 'creative', 'minimalist', 
+              'chronological', 'executive', 'international', 'academic',
+              'mixed', 'functional']] // Añadir nuevas plantillas
+    }
   },
   downloadsRemaining: {
     type: DataTypes.INTEGER,
