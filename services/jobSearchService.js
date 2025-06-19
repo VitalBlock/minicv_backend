@@ -15,9 +15,9 @@ exports.searchJobs = async (query, location) => {
     const response = await axios.get(REMOTIVE_API_URL, {
       params: {
         search: query,
-        limit: 20
+        limit: 30 // Aumentamos el límite para tener más resultados
       },
-      timeout: 10000 // Añadir timeout para evitar esperas largas
+      timeout: 15000 // Timeout aumentado para dar tiempo a la API
     });
     
     if (!response.data || !response.data.jobs) {
@@ -25,15 +25,25 @@ exports.searchJobs = async (query, location) => {
       return [];
     }
     
+    logger.info(`Remotive API devolvió ${response.data.jobs.length} resultados`);
+    
     // Filtrar por ubicación si se proporciona
     let jobs = response.data.jobs;
     
     if (location && location.trim() !== '') {
       const locationLower = location.toLowerCase();
-      jobs = jobs.filter(job => 
+      const filteredJobs = jobs.filter(job => 
         job.candidate_required_location && 
         job.candidate_required_location.toLowerCase().includes(locationLower)
       );
+      
+      // Solo usar filtrado si devuelve resultados, sino mantener los originales
+      if (filteredJobs.length > 0) {
+        logger.info(`Filtrado por ubicación: ${filteredJobs.length} resultados`);
+        jobs = filteredJobs;
+      } else {
+        logger.info(`Filtrado por ubicación sin resultados, mostrando todos los empleos`);
+      }
     }
     
     // Transformar a formato estándar
@@ -47,7 +57,7 @@ exports.searchJobs = async (query, location) => {
         : 'Descripción no disponible',
       url: job.url || '',
       postedDate: job.publication_date ? job.publication_date.split('T')[0] : new Date().toISOString().split('T')[0],
-      salary: 'Consultar'
+      salary: job.salary || 'Consultar'
     }));
   } catch (error) {
     logger.error('Error en búsqueda de empleos', error);
