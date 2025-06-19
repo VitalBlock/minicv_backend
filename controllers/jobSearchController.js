@@ -1,20 +1,10 @@
 const jobService = require('../services/jobSearchService');
 const logger = require('../utils/logger');
+const { v4: uuidv4 } = require('uuid');
 
 // Base de datos simulada con ofertas de alta calidad
 const SIMULATED_JOBS = [
-  {
-    id: "sim1",
-    title: "Desarrollador Frontend Senior",
-    company: "TechCorp Global",
-    location: "Bogotá, Colombia",
-    salary: "$4.500.000 - $6.500.000 COP",
-    description: "Buscamos un desarrollador frontend experimentado para liderar proyectos utilizando React y TypeScript. Deberás optimizar el rendimiento de aplicaciones web complejas y colaborar con equipos multidisciplinarios para crear experiencias de usuario excepcionales.",
-    skills: ["react", "typescript", "redux", "graphql", "optimización"],
-    postedDate: "2023-12-01",
-    url: "https://ejemplo.com/trabajo/1"
-  },
-  // ... más trabajos simulados de alta calidad
+  // Los trabajos simulados que ya están implementados
 ];
 
 /**
@@ -36,7 +26,6 @@ exports.searchJobs = async (req, res) => {
       logger.info(`Encontrados ${jobs.length} empleos en API externa`);
     } catch (apiError) {
       logger.warn('Error al buscar en API externa, usando datos simulados', apiError);
-      // Si falla la API, usamos datos simulados
       jobs = [];
     }
     
@@ -45,28 +34,27 @@ exports.searchJobs = async (req, res) => {
       logger.info('Complementando con datos simulados');
       
       // Filtrar trabajos simulados según términos de búsqueda
-      const searchTerms = q.toLowerCase().split(/\s+/);
-      const locationTerms = location ? location.toLowerCase().split(/\s+/) : [];
+      const searchTerms = q.toLowerCase().split(/\s+/).filter(term => term.length > 2);
+      const locationTerms = location ? location.toLowerCase().split(/\s+/).filter(term => term.length > 2) : [];
       
       const filteredSimulatedJobs = SIMULATED_JOBS.filter(job => {
         // Verificar coincidencia con términos de búsqueda
         const matchesSearch = searchTerms.some(term => 
           job.title.toLowerCase().includes(term) || 
           job.description.toLowerCase().includes(term) ||
-          job.skills.some(skill => skill.includes(term))
+          (job.skills && job.skills.some(skill => skill.includes(term)))
         );
         
-        // Verificar coincidencia con ubicación
-        const matchesLocation = !location || locationTerms.some(term => 
-          job.location.toLowerCase().includes(term)
-        );
+        // Verificar coincidencia con ubicación (si se especificó)
+        const matchesLocation = locationTerms.length === 0 || 
+          locationTerms.some(term => job.location.toLowerCase().includes(term));
         
         return matchesSearch && matchesLocation;
       });
       
       // Combinar resultados reales con simulados
       jobs = [...jobs, ...filteredSimulatedJobs]
-        // Eliminar posibles duplicados
+        // Eliminar posibles duplicados por ID
         .filter((job, index, self) => 
           index === self.findIndex(j => j.id === job.id)
         )

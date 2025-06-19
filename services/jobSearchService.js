@@ -16,8 +16,14 @@ exports.searchJobs = async (query, location) => {
       params: {
         search: query,
         limit: 20
-      }
+      },
+      timeout: 10000 // Añadir timeout para evitar esperas largas
     });
+    
+    if (!response.data || !response.data.jobs) {
+      logger.warn('Respuesta de API Remotive sin datos de trabajos');
+      return [];
+    }
     
     // Filtrar por ubicación si se proporciona
     let jobs = response.data.jobs;
@@ -25,6 +31,7 @@ exports.searchJobs = async (query, location) => {
     if (location && location.trim() !== '') {
       const locationLower = location.toLowerCase();
       jobs = jobs.filter(job => 
+        job.candidate_required_location && 
         job.candidate_required_location.toLowerCase().includes(locationLower)
       );
     }
@@ -32,12 +39,14 @@ exports.searchJobs = async (query, location) => {
     // Transformar a formato estándar
     return jobs.map(job => ({
       id: job.id.toString(),
-      title: job.title,
-      company: job.company_name,
+      title: job.title || 'Título no disponible',
+      company: job.company_name || 'Empresa no especificada',
       location: job.candidate_required_location || 'Remoto',
-      description: job.description.replace(/<\/?[^>]+(>|$)/g, "").substring(0, 300) + '...',
-      url: job.url,
-      postedDate: job.publication_date.split('T')[0],
+      description: job.description 
+        ? job.description.replace(/<\/?[^>]+(>|$)/g, "").substring(0, 300) + '...'
+        : 'Descripción no disponible',
+      url: job.url || '',
+      postedDate: job.publication_date ? job.publication_date.split('T')[0] : new Date().toISOString().split('T')[0],
       salary: 'Consultar'
     }));
   } catch (error) {
