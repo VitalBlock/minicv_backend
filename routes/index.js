@@ -11,10 +11,10 @@ router.use('/auth', require('./authRoutes'));
 router.use('/user-cvs', require('./userCVRoutes'));
 router.use('/admin', require('./adminRoutes'));
 
-// Importar rutas
+// Asegúrate de tener esta sección en tu archivo de rutas principal
 const jobSearchRoutes = require('./jobSearchRoutes');
 
-// Rutas de la API
+// Añadir la ruta de búsqueda de empleos
 router.use('/jobs', jobSearchRoutes);
 
 module.exports = router;
