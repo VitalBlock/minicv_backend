@@ -6,7 +6,7 @@ const cors = require('cors');
 const routes = require('./routes');
 const { errorHandler } = require('./middleware/errorHandler');
 const cookieParser = require('cookie-parser');
-const { sequelize } = require('./config/database');
+const { sequelize, initializeDatabase } = require('./config/database');
 
 const app = express();
 
@@ -63,8 +63,10 @@ app.use(errorHandler);
 // Sincronizar modelos con la base de datos
 (async () => {
   try {
-    // Usar alter:true para modificar tablas existentes sin eliminar datos
-    await sequelize.sync({ alter: true }); 
+    await initializeDatabase({ 
+      sync: true, 
+      syncOptions: { alter: true } 
+    });
     console.log('Modelos sincronizados con la base de datos');
   } catch (error) {
     console.error('Error al sincronizar modelos:', error);
@@ -77,4 +79,23 @@ app.listen(PORT, () => {
   console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
   console.log(`Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
 });
+
+// Validar variables de entorno requeridas
+const requiredEnvVars = [
+  'MERCADO_PAGO_ACCESS_TOKEN',
+  'MERCADO_PAGO_PUBLIC_KEY',
+  'JWT_SECRET'
+];
+
+const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+if (missingVars.length > 0) {
+  console.error('Variables de entorno faltantes:', missingVars.join(', '));
+  console.error('Por favor configura estas variables en el archivo .env o en las variables de entorno');
+  
+  // En desarrollo, terminar el proceso
+  if (process.env.NODE_ENV !== 'production') {
+    process.exit(1);
+  }
+}
+
 module.exports = app;
