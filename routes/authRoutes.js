@@ -11,4 +11,9 @@ router.post('/logout', authController.logout);
 // Rutas protegidas
 router.get('/me', protect, authController.getCurrentUser);
 
+// Rutas protegidas para gestión del perfil
+router.put('/update-profile', protect, authController.updateProfile);
+router.put('/change-password', protect, authController.changePassword);
+router.delete('/delete-account', protect, authController.deleteAccount);
+
 module.exports = router;

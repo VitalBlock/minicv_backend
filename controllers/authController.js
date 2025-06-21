@@ -177,3 +177,126 @@ exports.getCurrentUser = async (req, res) => {
     return res.status(500).json({ error: 'Error al obtener información del usuario' });
   }
 };
+
+// Actualizar perfil de usuario
+exports.updateProfile = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name, email } = req.body;
+    
+    // Validar datos
+    if (!name) {
+      return res.status(400).json({ error: 'El nombre es requerido' });
+    }
+    
+    // Si se intenta cambiar el email, verificar que no esté en uso
+    if (email && email !== req.user.email) {
+      const existingUser = await User.findOne({ where: { email } });
+      if (existingUser) {
+        return res.status(400).json({ error: 'El correo electrónico ya está en uso' });
+      }
+    }
+    
+    // Buscar usuario
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    // Actualizar datos
+    user.name = name;
+    if (email) user.email = email;
+    
+    await user.save();
+    
+    // Devolver usuario actualizado sin la contraseña
+    return res.status(200).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role || 'user',
+      createdAt: user.createdAt
+    });
+  } catch (error) {
+    logger.error('Error al actualizar perfil de usuario', error);
+    return res.status(500).json({ error: 'Error al actualizar perfil' });
+  }
+};
+
+// Cambiar contraseña
+exports.changePassword = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { currentPassword, newPassword } = req.body;
+    
+    // Validar datos
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ error: 'Todos los campos son requeridos' });
+    }
+    
+    if (newPassword.length < 6) {
+      return res.status(400).json({ error: 'La nueva contraseña debe tener al menos 6 caracteres' });
+    }
+    
+    // Buscar usuario
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    // Verificar contraseña actual
+    const isMatch = await user.comparePassword(currentPassword);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Contraseña actual incorrecta' });
+    }
+    
+    // Actualizar contraseña
+    user.password = newPassword;
+    await user.save();
+    
+    return res.status(200).json({ message: 'Contraseña actualizada correctamente' });
+  } catch (error) {
+    logger.error('Error al cambiar contraseña', error);
+    return res.status(500).json({ error: 'Error al cambiar contraseña' });
+  }
+};
+
+// Eliminar cuenta
+exports.deleteAccount = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { password } = req.body;
+    
+    // Validar datos
+    if (!password) {
+      return res.status(400).json({ error: 'La contraseña es requerida' });
+    }
+    
+    // Buscar usuario
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    // Verificar contraseña
+    const isMatch = await user.comparePassword(password);
+    if (!isMatch) {
+      return res.status(400).json({ error: 'Contraseña incorrecta' });
+    }
+    
+    // Eliminar CVs del usuario
+    await UserCV.destroy({ where: { userId } });
+    
+    // Eliminar usuario
+    await user.destroy();
+    
+    // Eliminar cookies
+    res.clearCookie('token');
+    res.clearCookie('sessionId');
+    
+    return res.status(200).json({ message: 'Cuenta eliminada correctamente' });
+  } catch (error) {
+    logger.error('Error al eliminar cuenta', error);
+    return res.status(500).json({ error: 'Error al eliminar cuenta' });
+  }
+};
