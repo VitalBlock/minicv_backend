@@ -16,25 +16,36 @@ const CoverLetter = sequelize.define('CoverLetter', {
       key: 'id'
     }
   },
-  name: {
+  title: {
     type: DataTypes.STRING,
-    allowNull: false,
-    defaultValue: 'Mi Carta de Presentación'
-  },
-  content: {
-    type: DataTypes.TEXT,
     allowNull: false
-  },
-  jobPosition: {
-    type: DataTypes.STRING,
-    allowNull: true
   },
   company: {
     type: DataTypes.STRING,
     allowNull: true
   },
-  letterData: {
-    type: DataTypes.JSON,
+  position: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  recipient: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  toneStyle: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  industry: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  customContent: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  template: {
+    type: DataTypes.STRING,
     allowNull: true
   }
 }, {

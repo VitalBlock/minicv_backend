@@ -1,15 +1,16 @@
 const express = require('express');
 const router = express.Router();
-const interviewSimulatorController = require('../controllers/interviewSimulatorController');
-const { protect } = require('../middleware/authMiddleware');
+const simulatorController = require('../controllers/simulatorController');
+const { requireAuth } = require('../middleware/auth');
+const premiumAccess = require('../middleware/premiumAccess');
 
-// Iniciar una entrevista (puede ser con o sin autenticación)
-router.post('/start', interviewSimulatorController.startInterview);
+// Rutas básicas (1 sesión gratuita)
+router.post('/start', requireAuth, simulatorController.startSession);
+router.post('/question', requireAuth, simulatorController.generateQuestion);
+router.post('/analyze', requireAuth, simulatorController.analyzeResponse);
 
-// Enviar respuesta y obtener siguiente pregunta
-router.post('/answer', interviewSimulatorController.answerAndGetNext);
-
-// Obtener historial de entrevistas (requiere autenticación)
-router.get('/history', protect, interviewSimulatorController.getInterviewHistory);
+// Rutas premium (análisis avanzado, feedback detallado)
+router.post('/feedback', requireAuth, premiumAccess, simulatorController.generateFeedback);
+router.post('/advanced-analysis', requireAuth, premiumAccess, simulatorController.advancedAnalysis);
 
 module.exports = router;

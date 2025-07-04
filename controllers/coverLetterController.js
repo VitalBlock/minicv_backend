@@ -118,3 +118,43 @@ exports.deleteCoverLetter = async (req, res) => {
     return res.status(500).json({ error: 'Error al eliminar la carta de presentación' });
   }
 };
+
+exports.create = async (req, res) => {
+  try {
+    const { userId } = req.user;
+    const letterData = req.body;
+    
+    const coverLetter = await CoverLetter.create({
+      ...letterData,
+      userId
+    });
+    
+    res.status(201).json({
+      success: true,
+      coverLetter
+    });
+    
+  } catch (error) {
+    console.error('Error al crear carta de presentación:', error);
+    res.status(500).json({ error: 'Error al crear carta' });
+  }
+};
+
+exports.getAll = async (req, res) => {
+  try {
+    const { userId } = req.user;
+    
+    const coverLetters = await CoverLetter.findAll({
+      where: { userId },
+      order: [['updatedAt', 'DESC']]
+    });
+    
+    res.json(coverLetters);
+    
+  } catch (error) {
+    console.error('Error al obtener cartas:', error);
+    res.status(500).json({ error: 'Error al obtener cartas' });
+  }
+};
+
+// Implementar el resto de controladores (getOne, update, delete)

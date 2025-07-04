@@ -1,16 +1,20 @@
 const express = require('express');
 const router = express.Router();
 const coverLetterController = require('../controllers/coverLetterController');
-const { protect } = require('../middleware/authMiddleware');
+const { requireAuth } = require('../middleware/auth');
+const premiumAccess = require('../middleware/premiumAccess');
 
-// Todas las rutas requieren autenticación
-router.use(protect);
+// Rutas públicas
+router.get('/templates', coverLetterController.getTemplates);
 
-// Rutas CRUD para cartas de presentación
-router.post('/', coverLetterController.saveCoverLetter);
-router.get('/', coverLetterController.getUserCoverLetters);
-router.get('/:id', coverLetterController.getCoverLetter);
-router.put('/:id', coverLetterController.updateCoverLetter);
-router.delete('/:id', coverLetterController.deleteCoverLetter);
+// Rutas protegidas (requieren autenticación)
+router.post('/', requireAuth, coverLetterController.saveCoverLetter);
+router.get('/', requireAuth, coverLetterController.getUserCoverLetters);
+router.get('/:id', requireAuth, coverLetterController.getCoverLetterById);
+router.put('/:id', requireAuth, coverLetterController.updateCoverLetter);
+router.delete('/:id', requireAuth, coverLetterController.deleteCoverLetter);
+
+// Rutas premium (requieren suscripción o ser admin)
+router.post('/download', requireAuth, premiumAccess, coverLetterController.generatePDF);
 
 module.exports = router;

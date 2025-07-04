@@ -1,18 +1,19 @@
 const express = require('express');
 const router = express.Router();
-const interviewQuestionController = require('../controllers/interviewQuestionController');
-const { protect } = require('../middleware/authMiddleware');
+const interviewController = require('../controllers/interviewController');
+const { requireAuth } = require('../middleware/auth');
+const premiumAccess = require('../middleware/premiumAccess');
 
-// Obtener categorías (público)
-router.get('/categories', interviewQuestionController.getCategories);
+// Rutas públicas para categorías y preguntas
+router.get('/categories', interviewController.getCategories);
+router.get('/subcategories/:category', interviewController.getSubcategories);
+router.get('/:category', interviewController.getQuestionsByCategory);
+router.get('/:category/:subcategory', interviewController.getQuestionsBySubcategory);
 
-// Obtener preguntas por categoría (requiere autenticación)
-router.get('/category/:categoryId', protect, interviewQuestionController.getQuestionsByCategory);
+// Rutas que requieren autenticación
+router.post('/view', requireAuth, interviewController.registerView);
 
-// Obtener preguntas por subcategoría (requiere autenticación)
-router.get('/category/:categoryId/subcategory/:subcategoryId', protect, interviewQuestionController.getQuestionsBySubcategory);
-
-// Registrar uso de preguntas (requiere autenticación)
-router.post('/usage', protect, interviewQuestionController.registerUsage);
+// Rutas premium
+router.get('/premium/all', requireAuth, premiumAccess, interviewController.getAllQuestions);
 
 module.exports = router;
