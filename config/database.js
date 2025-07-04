@@ -9,6 +9,12 @@ const sequelize = POSTGRES_URL
   ? new Sequelize(POSTGRES_URL, {
       dialect: 'postgres',
       logging: process.env.NODE_ENV === 'development' ? console.log : false,
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false // Necesario para conexiones a Render
+        }
+      },
       pool: {
         max: 5,
         min: 0,
@@ -22,7 +28,13 @@ const sequelize = POSTGRES_URL
       password: process.env.PGPASSWORD,
       host: process.env.PGHOST,
       port: process.env.PGPORT || 5432,
-      dialect: 'postgres'
+      dialect: 'postgres',
+      dialectOptions: {
+        ssl: {
+          require: true,
+          rejectUnauthorized: false
+        }
+      }
     });
 
 // Conexión con reintentos, igual que antes

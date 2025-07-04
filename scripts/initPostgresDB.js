@@ -39,14 +39,22 @@ async function initializePostgresDB(options = {}) {
     logger.info('✅ Conexión establecida correctamente.');
 
     // Listar tablas antes de sincronizar
-    const [tables] = await sequelize.query(`
-      SELECT table_name FROM information_schema.tables 
-      WHERE table_schema = 'public'
-    `);
-    
-    if (tables.length > 0) {
-      logger.warn(`Se encontraron ${tables.length} tablas existentes:`);
-      logger.warn(tables.map(t => t.table_name).join(', '));
+    try {
+      const [results, metadata] = await sequelize.query(`
+        SELECT table_name FROM information_schema.tables 
+        WHERE table_schema = 'public'
+      `);
+      
+      // En PostgreSQL, el resultado es directamente un array de objetos
+      if (results && results.length > 0) {
+        logger.warn(`Se encontraron ${results.length} tablas existentes:`);
+        logger.warn(results.map(r => r.table_name).join(', '));
+      } else {
+        logger.info('No se encontraron tablas existentes.');
+      }
+    } catch (error) {
+      logger.warn('No se pudieron listar las tablas existentes:', error.message);
+      // Continuar con el proceso a pesar del error en esta consulta
     }
 
     // Determinar el modo de sincronización basado en opciones y entorno

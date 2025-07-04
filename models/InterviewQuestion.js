@@ -1,18 +1,27 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
-const InterviewSession = require('./InterviewSession');
+const InterviewCategory = require('./InterviewCategory');
+const InterviewSubcategory = require('./InterviewSubcategory');
 
-const InterviewExchange = sequelize.define('InterviewExchange', {
+const InterviewQuestion = sequelize.define('InterviewQuestion', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
     autoIncrement: true
   },
-  sessionId: {
+  categoryId: {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'interview_sessions',
+      model: 'interview_categories',
+      key: 'id'
+    }
+  },
+  subcategoryId: {
+    type: DataTypes.INTEGER,
+    allowNull: true,
+    references: {
+      model: 'interview_subcategories',
       key: 'id'
     }
   },
@@ -24,25 +33,24 @@ const InterviewExchange = sequelize.define('InterviewExchange', {
     type: DataTypes.TEXT,
     allowNull: true
   },
-  aiAnalysis: {
-    type: DataTypes.TEXT,
-    allowNull: true
+  difficulty: {
+    type: DataTypes.ENUM('basic', 'intermediate', 'advanced'),
+    defaultValue: 'intermediate'
   },
-  score: {
-    type: DataTypes.INTEGER, // 1-10
-    allowNull: true
-  },
-  questionNumber: {
-    type: DataTypes.INTEGER,
-    allowNull: false
+  isPremium: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   }
 }, {
-  tableName: 'interview_exchanges',
+  tableName: 'interview_questions',
   timestamps: true
 });
 
-// Establecer relación con Session
-InterviewSession.hasMany(InterviewExchange, { foreignKey: 'sessionId', as: 'exchanges' });
-InterviewExchange.belongsTo(InterviewSession, { foreignKey: 'sessionId', as: 'session' });
+// Establecer relaciones
+InterviewCategory.hasMany(InterviewQuestion, { foreignKey: 'categoryId', as: 'questions' });
+InterviewQuestion.belongsTo(InterviewCategory, { foreignKey: 'categoryId', as: 'category' });
 
-module.exports = InterviewExchange;
+InterviewSubcategory.hasMany(InterviewQuestion, { foreignKey: 'subcategoryId', as: 'questions' });
+InterviewQuestion.belongsTo(InterviewSubcategory, { foreignKey: 'subcategoryId', as: 'subcategory' });
+
+module.exports = InterviewQuestion;
