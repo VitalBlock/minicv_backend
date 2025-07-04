@@ -157,4 +157,54 @@ exports.getAll = async (req, res) => {
   }
 };
 
-// Implementar el resto de controladores (getOne, update, delete)
+// Obtener plantillas para cartas de presentación
+exports.getTemplates = (req, res) => {
+  try {
+    // Lista de plantillas disponibles para cartas de presentación
+    const templates = [
+      { 
+        id: 'standard', 
+        name: 'Estándar', 
+        description: 'Diseño profesional clásico adecuado para la mayoría de industrias' 
+      },
+      { 
+        id: 'modern', 
+        name: 'Moderno', 
+        description: 'Diseño contemporáneo con elementos visuales actualizados' 
+      },
+      { 
+        id: 'minimal', 
+        name: 'Minimalista', 
+        description: 'Diseño limpio y sencillo que destaca el contenido' 
+      },
+      { 
+        id: 'creative', 
+        name: 'Creativo', 
+        description: 'Diseño distintivo para destacar en sectores creativos' 
+      }
+    ];
+    
+    return res.status(200).json(templates);
+  } catch (error) {
+    console.error('Error al obtener plantillas:', error);
+    return res.status(500).json({ error: 'Error al recuperar plantillas' });
+  }
+};
+
+// Añadir esta función también
+exports.generatePDF = (req, res) => {
+  try {
+    // Nota: En una implementación real, aquí generaríamos un PDF
+    // utilizando una biblioteca como PDFKit o similar
+    
+    // Por ahora, simplemente indicamos que el servicio está disponible
+    return res.status(200).json({ 
+      success: true, 
+      message: 'Servicio de generación de PDF disponible',
+      url: null // Aquí se devolvería la URL al PDF generado
+    });
+  } catch (error) {
+    console.error('Error al generar PDF:', error);
+    return res.status(500).json({ error: 'Error al generar PDF' });
+  }
+};
