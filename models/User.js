@@ -31,6 +31,11 @@ const User = sequelize.define('User', {
   },
   lastLogin: {
     type: DataTypes.DATE
+  },
+  freeQuestionViews: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 20 // Número de preguntas gratuitas por día
   }
 }, {
   timestamps: true,

@@ -17,4 +17,9 @@ const jobSearchRoutes = require('./jobSearchRoutes');
 // Añadir la ruta de búsqueda de empleos
 router.use('/jobs', jobSearchRoutes);
 
+// Añadir nuevas rutas
+router.use('/cover-letters', require('./coverLetterRoutes'));
+router.use('/interview-questions', require('./interviewQuestionRoutes'));
+router.use('/interview-simulator', require('./interviewSimulatorRoutes'));
+
 module.exports = router;

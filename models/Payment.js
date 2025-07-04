@@ -1,6 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
-const User = require('./User'); // Añadir esta línea
+const User = require('./User'); 
 
 const Payment = sequelize.define('Payment', {
   id: {
@@ -42,7 +42,8 @@ const Payment = sequelize.define('Payment', {
     validate: {
       isIn: [['professional', 'modern', 'creative', 'minimalist', 
               'chronological', 'executive', 'international', 'academic',
-              'mixed', 'functional']] // Añadir nuevas plantillas
+              'mixed', 'functional', 'cover-letter', 'interview-questions', 
+              'interview-simulator', 'premium-bundle']]
     }
   },
   downloadsRemaining: {
