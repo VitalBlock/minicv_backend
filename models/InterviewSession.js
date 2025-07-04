@@ -1,7 +1,6 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/database');
 const User = require('./User');
-const InterviewExchange = require('./InterviewExchange');
 
 const InterviewSession = sequelize.define('InterviewSession', {
   id: {
@@ -58,8 +57,9 @@ const InterviewSession = sequelize.define('InterviewSession', {
 User.hasMany(InterviewSession, { foreignKey: 'userId' });
 InterviewSession.belongsTo(User, { foreignKey: 'userId' });
 
-// Establecer relación con InterviewExchange
+module.exports = InterviewSession;
+
+// Establecer las relaciones después de exportar
+const InterviewExchange = require('./InterviewExchange');
 InterviewSession.hasMany(InterviewExchange, { foreignKey: 'sessionId', as: 'exchanges' });
 InterviewExchange.belongsTo(InterviewSession, { foreignKey: 'sessionId', as: 'session' });
-
-module.exports = InterviewSession;

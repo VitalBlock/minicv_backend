@@ -67,9 +67,11 @@ app.use(errorHandler);
       sync: true, 
       syncOptions: { alter: true } 
     });
-    console.log('Modelos sincronizados con la base de datos');
+    console.log('✅ Modelos sincronizados con la base de datos');
   } catch (error) {
-    console.error('Error al sincronizar modelos:', error);
+    console.error('❌ Error al sincronizar modelos:', error);
+    console.log('⚠️ El servidor continuará funcionando pero algunas funciones pueden no estar disponibles');
+    // Continuar de todos modos
   }
 })();
 

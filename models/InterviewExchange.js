@@ -28,7 +28,7 @@ const InterviewExchange = sequelize.define('InterviewExchange', {
     allowNull: true
   },
   score: {
-    type: DataTypes.INTEGER, // 1-10
+    type: DataTypes.INTEGER,
     allowNull: true
   },
   questionNumber: {
