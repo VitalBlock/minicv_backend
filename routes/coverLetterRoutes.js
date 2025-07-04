@@ -10,7 +10,7 @@ router.get('/templates', coverLetterController.getTemplates);
 // Rutas protegidas (requieren autenticación)
 router.post('/', requireAuth, coverLetterController.saveCoverLetter);
 router.get('/', requireAuth, coverLetterController.getUserCoverLetters);
-router.get('/:id', requireAuth, coverLetterController.getCoverLetterById);
+router.get('/:id', requireAuth, coverLetterController.getCoverLetter); // Cambia getCoverLetterById por getCoverLetter para que coincida con el controlador
 router.put('/:id', requireAuth, coverLetterController.updateCoverLetter);
 router.delete('/:id', requireAuth, coverLetterController.deleteCoverLetter);
 
