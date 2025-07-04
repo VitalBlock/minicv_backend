@@ -1,5 +1,5 @@
 require('dotenv').config();
-const mysql = require('mysql2/promise');
+const { Client } = require('pg');
 
 // Colores para la consola
 const colors = {
@@ -13,87 +13,79 @@ const colors = {
 };
 
 async function testConnection() {
-  console.log(`${colors.cyan}Verificando conexión a MySQL en Railway...${colors.reset}`);
+  console.log(`${colors.cyan}Verificando conexión a PostgreSQL...${colors.reset}`);
   
   // Mostrar variables de entorno disponibles (sin mostrar contraseñas completas)
   console.log(`${colors.yellow}Variables de entorno detectadas:${colors.reset}`);
   
-  // Mostrar host
-  const host = process.env.MYSQLHOST || (process.env.MYSQL_URL && new URL(process.env.MYSQL_URL).hostname);
-  console.log(`- Host: ${colors.green}${host || 'No definido'}${colors.reset}`);
-  
-  // Mostrar puerto
-  const port = process.env.MYSQLPORT || (process.env.MYSQL_URL && new URL(process.env.MYSQL_URL).port);
-  console.log(`- Puerto: ${colors.green}${port || '3306 (default)'}${colors.reset}`);
-  
-  // Mostrar nombre de base de datos
-  const database = process.env.MYSQLDATABASE || process.env.MYSQL_DATABASE || 
-                   (process.env.MYSQL_URL && new URL(process.env.MYSQL_URL).pathname.substring(1));
-  console.log(`- Base de datos: ${colors.green}${database || 'No definida'}${colors.reset}`);
-  
-  // Mostrar usuario
-  const user = process.env.MYSQLUSER || 
-               (process.env.MYSQL_URL && new URL(process.env.MYSQL_URL).username);
-  console.log(`- Usuario: ${colors.green}${user || 'No definido'}${colors.reset}`);
-  
-  // Mostrar si hay contraseña (sin mostrarla completa)
-  const password = process.env.MYSQLPASSWORD || process.env.MYSQL_ROOT_PASSWORD || 
-                  (process.env.MYSQL_URL && new URL(process.env.MYSQL_URL).password);
-  console.log(`- Contraseña: ${colors.green}${password ? '********' + password.substring(password.length - 4) : 'No definida'}${colors.reset}`);
-  
-  // Mostrar URL completa si está disponible (con contraseña oculta)
-  if (process.env.MYSQL_URL) {
-    const url = new URL(process.env.MYSQL_URL);
+  // Verificar si existe DATABASE_URL
+  if (process.env.DATABASE_URL) {
+    const url = new URL(process.env.DATABASE_URL);
     url.password = '********';
     console.log(`- URL de conexión: ${colors.green}${url.toString()}${colors.reset}`);
+    
+    // Mostrar componentes individuales
+    console.log(`- Host: ${colors.green}${url.hostname}${colors.reset}`);
+    console.log(`- Puerto: ${colors.green}${url.port || '5432 (default)'}${colors.reset}`);
+    console.log(`- Base de datos: ${colors.green}${url.pathname.substring(1)}${colors.reset}`);
+    console.log(`- Usuario: ${colors.green}${url.username}${colors.reset}`);
+    console.log(`- Contraseña: ${colors.green}${'********' + (url.password ? url.password.substring(url.password.length - 4) : '')}${colors.reset}`);
+  } else {
+    // Mostrar variables individuales
+    console.log(`- Host: ${colors.green}${process.env.PGHOST || 'No definido'}${colors.reset}`);
+    console.log(`- Puerto: ${colors.green}${process.env.PGPORT || '5432 (default)'}${colors.reset}`);
+    console.log(`- Base de datos: ${colors.green}${process.env.PGDATABASE || 'No definida'}${colors.reset}`);
+    console.log(`- Usuario: ${colors.green}${process.env.PGUSER || 'No definido'}${colors.reset}`);
+    console.log(`- Contraseña: ${colors.green}${process.env.PGPASSWORD ? '********' + process.env.PGPASSWORD.substring(process.env.PGPASSWORD.length - 4) : 'No definida'}${colors.reset}`);
   }
   
   try {
-    // Intentar conexión
-    let connection;
+    // Configuración del cliente
+    const client = new Client({
+      connectionString: process.env.DATABASE_URL,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
     
-    // Primero intentar con MYSQL_URL si está disponible
-    if (process.env.MYSQL_URL) {
-      console.log(`${colors.yellow}Intentando conexión con MYSQL_URL...${colors.reset}`);
-      connection = await mysql.createConnection(process.env.MYSQL_URL);
-    } 
-    // Si no hay MYSQL_URL, intentar con variables individuales
-    else if (process.env.MYSQLHOST && process.env.MYSQLUSER && process.env.MYSQLPASSWORD) {
-      console.log(`${colors.yellow}Intentando conexión con variables individuales...${colors.reset}`);
-      connection = await mysql.createConnection({
-        host: process.env.MYSQLHOST,
-        port: process.env.MYSQLPORT || 3306,
-        user: process.env.MYSQLUSER,
-        password: process.env.MYSQLPASSWORD,
-        database: process.env.MYSQLDATABASE || 'railway'
-      });
-    } else {
-      throw new Error('No se encontraron credenciales suficientes para la conexión');
-    }
+    // Intentar conexión
+    console.log(`${colors.yellow}Intentando conectar a PostgreSQL...${colors.reset}`);
+    await client.connect();
+    console.log(`${colors.green}✅ ¡Conexión exitosa!${colors.reset}`);
     
     // Probar consulta simple
     console.log(`${colors.yellow}Ejecutando consulta de prueba...${colors.reset}`);
-    const [rows] = await connection.execute('SELECT 1 as result');
+    const res = await client.query('SELECT current_timestamp as now');
+    console.log(`${colors.cyan}Servidor PostgreSQL: ${colors.reset}`, res.rows[0]);
     
-    console.log(`${colors.green}✅ ¡Conexión exitosa!${colors.reset}`);
-    console.log(`${colors.cyan}Resultado de prueba:${colors.reset}`, rows[0]);
-    
-    // Verificar si la tabla ConversionEvent existe
+    // Verificar si la tabla conversion_events existe
     try {
-      const [tables] = await connection.execute("SHOW TABLES LIKE 'conversion_events'");
-      if (tables.length > 0) {
+      const tables = await client.query(`
+        SELECT table_name 
+        FROM information_schema.tables 
+        WHERE table_schema = 'public' 
+        AND table_name = 'conversion_events'
+      `);
+      
+      if (tables.rowCount > 0) {
         console.log(`${colors.green}✅ Tabla 'conversion_events' encontrada.${colors.reset}`);
         
         // Mostrar estructura de la tabla
-        const [columns] = await connection.execute("DESCRIBE conversion_events");
+        const columns = await client.query(`
+          SELECT column_name, data_type, is_nullable 
+          FROM information_schema.columns 
+          WHERE table_schema = 'public' 
+          AND table_name = 'conversion_events'
+        `);
+        
         console.log(`${colors.cyan}Estructura de la tabla:${colors.reset}`);
-        columns.forEach(col => {
-          console.log(`  - ${col.Field}: ${col.Type} ${col.Null === 'NO' ? '(requerido)' : ''}`);
+        columns.rows.forEach(col => {
+          console.log(`  - ${col.column_name}: ${col.data_type} ${col.is_nullable === 'NO' ? '(requerido)' : ''}`);
         });
         
         // Contar registros
-        const [count] = await connection.execute("SELECT COUNT(*) as total FROM conversion_events");
-        console.log(`${colors.cyan}Total de registros: ${colors.green}${count[0].total}${colors.reset}`);
+        const count = await client.query('SELECT COUNT(*) as total FROM conversion_events');
+        console.log(`${colors.cyan}Total de registros: ${colors.green}${count.rows[0].total}${colors.reset}`);
       } else {
         console.log(`${colors.yellow}⚠️ Tabla 'conversion_events' no encontrada.${colors.reset}`);
         console.log(`${colors.cyan}Se creará automáticamente cuando inicies el servidor.${colors.reset}`);
@@ -103,19 +95,23 @@ async function testConnection() {
     }
     
     // Cerrar conexión
-    await connection.end();
+    await client.end();
     
     return true;
   } catch (error) {
     console.error(`${colors.red}❌ Error de conexión: ${error.message}${colors.reset}`);
     
     // Proporcionar sugerencias según el error
-    if (error.message.includes('connect ETIMEDOUT')) {
-      console.log(`${colors.yellow}Sugerencia: Verifica que la IP de tu servidor esté en la lista de IPs permitidas en Railway.${colors.reset}`);
-    } else if (error.message.includes('Access denied')) {
+    if (error.message.includes('ETIMEDOUT')) {
+      console.log(`${colors.yellow}Sugerencia: Verifica que la IP de tu servidor esté en la lista de IPs permitidas.${colors.reset}`);
+    } else if (error.message.includes('password authentication failed')) {
       console.log(`${colors.yellow}Sugerencia: Verifica que el nombre de usuario y contraseña sean correctos.${colors.reset}`);
-    } else if (error.message.includes('Unknown database')) {
+    } else if (error.message.includes('does not exist')) {
       console.log(`${colors.yellow}Sugerencia: La base de datos no existe. Verifica el nombre o créala.${colors.reset}`);
+    } else if (error.message.includes('ECONNREFUSED')) {
+      console.log(`${colors.yellow}Sugerencia: No se puede conectar al servidor. Verifica que esté en ejecución y que el host/puerto sean correctos.${colors.reset}`);
+    } else if (error.message.includes('SSL')) {
+      console.log(`${colors.yellow}Sugerencia: Hay un problema con la conexión SSL. Intenta configurar la opción rejectUnauthorized: false.${colors.reset}`);
     }
     
     return false;

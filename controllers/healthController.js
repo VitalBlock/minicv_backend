@@ -1,4 +1,4 @@
-const testConnection = require('../scripts/testDbConnection');
+const testConnection = require('../scripts/testPgConnection');
 
 exports.checkHealth = async (req, res) => {
   try {
