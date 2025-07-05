@@ -10,29 +10,29 @@ const { sequelize, initializeDatabase } = require('./config/database');
 
 const app = express();
 
+// Actualizar la lista de orígenes permitidos
 const allowedOrigins = [
   'https://minicv.univerdad.me',     // Tu dominio personalizado
-  'http://localhost:3000',  // Para desarrollo local
+  'https://minicv.onrender.com',     // Añadir el dominio de producción
+  'http://localhost:3000',           // Para desarrollo local
   'https://minicv-frontend.vercel.app', // Dominio de Vercel    
   'https://www.mercadopago.com.ar',  // Para webhooks de MercadoPago
   'https://www.mercadopago.com.co'   // Para webhooks de MercadoPago Colombia
 ];
 
-// Middleware CORS
+// Middleware CORS - Hacer estricta la validación
 app.use(cors({
   origin: function(origin, callback) {
     // Permitir solicitudes sin origen (como aplicaciones móviles o herramientas de API)
     if (!origin) return callback(null, true);
     
-    // Usar una comparación más flexible para dominios
-    if (allowedOrigins.some(allowedOrigin => 
-      origin === allowedOrigin || origin.startsWith(allowedOrigin)
-    )) {
-      return callback(null, true);
+    // Comprobar si el origen está en la lista de permitidos
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log('Origen rechazado por CORS:', origin);
+      callback(new Error('No permitido por CORS'));
     }
-    
-    console.log('Origen rechazado por CORS:', origin);
-    callback(null, true); // Temporalmente permitir todos los orígenes para debugging
   },
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   credentials: true,
