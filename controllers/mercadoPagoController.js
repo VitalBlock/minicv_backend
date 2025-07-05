@@ -17,77 +17,40 @@ exports.createPreference = async (req, res) => {
   try {
     const { title, price, quantity, template, isSubscription, productType } = req.body;
     
-    logger.info('Creando preferencia de pago', { 
-      title, price, quantity, template, isSubscription, productType 
-    });
-    
-    // Validar datos
-    if (!title || !price) {
-      return res.status(400).json({ error: 'Faltan datos requeridos' });
+    // Validación básica
+    if (!price) {
+      return res.status(400).json({ error: 'Precio no válido' });
     }
     
-    // Obtener ID de sesión
-    const sessionId = req.cookies.sessionId || uuidv4();
-    
-    // Si no hay cookie de sesión, establecerla
-    if (!req.cookies.sessionId) {
-      res.cookie('sessionId', sessionId, { 
-        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
-        httpOnly: true,
-        secure: config.nodeEnv === 'production',
-        sameSite: config.nodeEnv === 'production' ? 'none' : 'lax'
-      });
-    }
-    
-    // Preparar datos base para la preferencia
-    const priceInteger = parseInt(price);
-    const quantityInteger = parseInt(quantity || 1);
-    const preferenceItems = [{
-      title: title,
-      unit_price: priceInteger,
-      quantity: quantityInteger,
-      currency_id: 'COP'
-    }];
-    
-    // Referencia externa para suscripción o compra única
-    const externalReference = isSubscription 
-      ? `${sessionId}-subscription-${productType || 'interview-pack'}`
-      : `${sessionId}-${template}`;
-    
-    // URLs de retorno
-    const backUrls = {
-      success: `${config.frontendUrl}/payment/mercadopago/success`,
-      failure: `${config.frontendUrl}/payment/mercadopago/failure`,
-      pending: `${config.frontendUrl}/payment/mercadopago/pending`
-    };
-    
-    // Crear preferencia base
-    const preference = {
-      items: preferenceItems,
-      external_reference: externalReference,
-      back_urls: backUrls,
+    // Configuración básica para la preferencia
+    const preferenceData = {
+      items: [{
+        title: title || 'Servicio MiniCV',
+        unit_price: parseInt(price),
+        quantity: parseInt(quantity || 1),
+        currency_id: 'COP'
+      }],
+      back_urls: {
+        success: `${config.frontendUrl}/payment/mercadopago/success`,
+        failure: `${config.frontendUrl}/payment/mercadopago/failure`,
+        pending: `${config.frontendUrl}/payment/mercadopago/pending`
+      },
       auto_return: 'approved',
-      notification_url: `${config.backendUrl}/api/mercadopago/webhook`,
-      metadata: {
-        product_type: productType || template || 'interview-pack',
-        is_subscription: !!isSubscription,
-        sessionId: sessionId
-      }
+      statement_descriptor: 'MiniCV',
+      external_reference: isSubscription ? 'interview-pack' : template
     };
     
-    // Crear preferencia en MercadoPago
-    const response = await mercadopago.preferences.create(preference);
+    // Crear preferencia directamente sin lógica compleja
+    const response = await mercadopago.preferences.create(preferenceData);
     
-    // Guardar registro en la base de datos
+    // Registrar en base de datos básico
     await Payment.create({
-      sessionId: sessionId,
+      sessionId: req.cookies.sessionId || `session_${Date.now()}`,
       mercadoPagoId: response.body.id,
-      amount: priceInteger,
+      amount: parseInt(price),
       status: 'pending',
-      template: productType || template || 'interview-pack',
-      productType: productType || template || 'interview-pack',
-      isSubscription: !!isSubscription,
-      downloadsRemaining: isSubscription ? 999 : 5
+      template: template || 'interview-pack',
+      isSubscription: !!isSubscription
     });
     
     return res.status(201).json({
@@ -96,10 +59,10 @@ exports.createPreference = async (req, res) => {
       sandbox_init_point: response.body.sandbox_init_point
     });
   } catch (error) {
-    logger.error('Error al crear preferencia', error);
+    console.error('Error detallado al crear preferencia:', error);
     return res.status(500).json({ 
       error: 'Error al crear la preferencia de pago',
-      details: error.message
+      details: error.message 
     });
   }
 };

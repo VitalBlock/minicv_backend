@@ -33,4 +33,18 @@ router.get('/check-user-payment', checkUserPaymentGeneral);
 router.post('/register-download/:template', registerDownload);
 router.post('/initialize-session', initializeSession);
 
+// Probar configuración de Mercado Pago
+router.get('/test-config', (req, res) => {
+  try {
+    const config = {
+      mercadoPagoConfigured: !!process.env.MERCADO_PAGO_ACCESS_TOKEN,
+      frontendUrl: process.env.FRONTEND_URL,
+      backendUrl: process.env.BACKEND_URL
+    };
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;

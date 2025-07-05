@@ -1,10 +1,6 @@
 const mercadopago = require('mercadopago');
-const dotenv = require('dotenv');
 
-// Cargar variables de entorno primero
-dotenv.config();
-
-// Definir el token de acceso directamente como respaldo
+// Usar el token de acceso configurado
 const accessToken = process.env.MERCADO_PAGO_ACCESS_TOKEN || 'APP_USR-7192668342606025-061420-cd6839425a3d14fdbf408ff550e53473-1541849948';
 
 // Verificar que tengamos un token válido
@@ -13,9 +9,8 @@ if (!accessToken) {
   process.exit(1);
 }
 
-console.log('Configurando MercadoPago con token:', accessToken.substring(0, 10) + '...');
-
-// Configurar MercadoPago con el token de acceso
+// Configurar con logs para depuración
+console.log('Configurando MercadoPago...');
 mercadopago.configure({
   access_token: accessToken
 });
