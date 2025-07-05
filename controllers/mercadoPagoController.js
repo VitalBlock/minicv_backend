@@ -41,21 +41,24 @@ exports.createPreference = async (req, res) => {
     
     // Si es una suscripción, manejarla diferente
     if (isSubscription) {
+      logger.info('Creando preferencia para suscripción', { productType });
+      
       // Referencia externa para suscripción
       const externalReference = `${sessionId}-${productType || 'interview-pack'}`;
       
-      // Crear preferencia de pago para suscripción
+      // Crear preferencia de pago para suscripción con URLs corregidas
       const preference = {
         items: [{
-          title: title,
-          unit_price: parseInt(price),
-          quantity: parseInt(quantity)
+          title: title || 'Pack Profesional de Entrevista',
+          unit_price: parseInt(price) || 15000,
+          quantity: parseInt(quantity) || 1,
+          currency_id: 'COP'
         }],
         external_reference: externalReference,
         back_urls: {
-          success: `${config.frontendUrl}/payment/mercadopago/success`,
-          failure: `${config.frontendUrl}/payment/mercadopago/failure`,
-          pending: `${config.frontendUrl}/payment/mercadopago/pending`
+          success: `${config.frontendUrl}/payment/success`,
+          failure: `${config.frontendUrl}/payment/failure`,
+          pending: `${config.frontendUrl}/payment/pending`
         },
         auto_return: 'approved',
         notification_url: `${config.backendUrl}/api/mercadopago/webhook`,
@@ -66,25 +69,39 @@ exports.createPreference = async (req, res) => {
         }
       };
       
-      // Crear preferencia en MercadoPago
-      const response = await mercadopago.preferences.create(preference);
-      
-      // Crear registro de pago pendiente
-      await Payment.create({
-        sessionId: sessionId,
-        mercadoPagoId: response.body.id,
-        amount: parseInt(price),
-        status: 'pending',
-        template: productType || 'interview-pack',
-        productType: productType || 'interview-pack',
-        isSubscription: true,
-        downloadsRemaining: 999 // Representando acceso ilimitado
-      });
-      
-      logger.info('Preferencia de suscripción creada', { id: response.body.id });
-      
-      // Retornar la preferencia
-      return res.status(201).json(response.body);
+      try {
+        logger.info('Enviando preferencia a MercadoPago', { preference });
+        const response = await mercadopago.preferences.create(preference);
+        
+        // Registrar en BD
+        await Payment.create({
+          sessionId: sessionId,
+          mercadoPagoId: response.body.id,
+          amount: parseInt(price) || 15000,
+          status: 'pending',
+          template: productType || 'interview-pack',
+          productType: productType || 'interview-pack',
+          isSubscription: true,
+          downloadsRemaining: 999 // Acceso ilimitado
+        });
+        
+        logger.info('Preferencia de suscripción creada', { 
+          id: response.body.id, 
+          init_point: response.body.init_point 
+        });
+        
+        return res.status(201).json({
+          id: response.body.id,
+          init_point: response.body.init_point,
+          sandbox_init_point: response.body.sandbox_init_point
+        });
+      } catch (mpError) {
+        logger.error('Error de MercadoPago al crear preferencia', mpError);
+        return res.status(500).json({
+          error: 'Error al crear preferencia de pago',
+          details: mpError.message
+        });
+      }
     }
     
     // No hay descargas disponibles, crear nueva preferencia de pago
