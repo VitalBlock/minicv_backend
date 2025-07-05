@@ -10,6 +10,7 @@ router.post('/logout', authController.logout);
 
 // Rutas protegidas
 router.get('/me', protect, authController.getCurrentUser);
+router.get('/subscription-status', protect, authController.checkSubscription);
 
 // Rutas protegidas para gestión del perfil
 router.put('/update-profile', protect, authController.updateProfile);

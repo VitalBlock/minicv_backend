@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const config = require('../config');
 const { v4: uuidv4 } = require('uuid');
 const Payment = require('../models/Payment');
+const { Op } = require('sequelize');
 
 // Generar token JWT
 const generateToken = (userId) => {
@@ -298,5 +299,33 @@ exports.deleteAccount = async (req, res) => {
   } catch (error) {
     logger.error('Error al eliminar cuenta', error);
     return res.status(500).json({ error: 'Error al eliminar cuenta' });
+  }
+};
+
+// Añadir este método al controlador de autenticación
+exports.checkSubscription = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Buscar suscripción activa en la base de datos
+    const subscription = await Payment.findOne({
+      where: {
+        userId,
+        isSubscription: true,
+        status: 'approved',
+        subscriptionEndDate: {
+          [Op.gt]: new Date() // Fecha fin mayor que hoy
+        }
+      },
+      order: [['subscriptionEndDate', 'DESC']]
+    });
+    
+    return res.json({
+      active: !!subscription,
+      subscription: subscription || null
+    });
+  } catch (error) {
+    console.error('Error al verificar suscripción:', error);
+    return res.status(500).json({ error: 'Error al verificar suscripción' });
   }
 };

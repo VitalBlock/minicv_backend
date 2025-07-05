@@ -53,9 +53,9 @@ exports.createPreference = async (req, res) => {
         }],
         external_reference: externalReference,
         back_urls: {
-          success: `${config.frontendUrl}/payment/success`,
-          failure: `${config.frontendUrl}/payment/failure`,
-          pending: `${config.frontendUrl}/payment/pending`
+          success: `${config.frontendUrl}/payment/mercadopago/success`,
+          failure: `${config.frontendUrl}/payment/mercadopago/failure`,
+          pending: `${config.frontendUrl}/payment/mercadopago/pending`
         },
         auto_return: 'approved',
         notification_url: `${config.backendUrl}/api/mercadopago/webhook`,
