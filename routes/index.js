@@ -1,25 +1,27 @@
 const express = require('express');
 const router = express.Router();
+const authRoutes = require('./authRoutes');
+const userCVRoutes = require('./userCVRoutes');
+const adminRoutes = require('./adminRoutes');
 const mercadoPagoRoutes = require('./mercadoPagoRoutes');
-const analyticsRoutes = require('./analyticsRoutes');
-const healthController = require('../controllers/healthController');
-
-// Otras rutas
-router.use('/mercadopago', mercadoPagoRoutes);
-router.use('/analytics', analyticsRoutes);
-router.use('/auth', require('./authRoutes'));
-router.use('/user-cvs', require('./userCVRoutes'));
-router.use('/admin', require('./adminRoutes'));
-
-// Asegúrate de tener esta sección en tu archivo de rutas principal
 const jobSearchRoutes = require('./jobSearchRoutes');
+const coverLetterRoutes = require('./coverLetterRoutes');
+const interviewQuestionRoutes = require('./interviewQuestionRoutes');
+const interviewSimulatorRoutes = require('./interviewSimulatorRoutes');
+const healthController = require('../controllers/healthController');
+const { requireAuth } = require('../middleware/auth');
 
-// Añadir la ruta de búsqueda de empleos
-router.use('/jobs', jobSearchRoutes);
+// Rutas públicas
+router.get('/health', healthController.checkHealth);
+router.use('/auth', authRoutes);
+router.use('/mercadopago', mercadoPagoRoutes); // Necesario para pagos
 
-// Añadir nuevas rutas
-router.use('/cover-letters', require('./coverLetterRoutes'));
-router.use('/interview-questions', require('./interviewQuestionRoutes'));
-router.use('/interview-simulator', require('./interviewSimulatorRoutes'));
+// Rutas protegidas - requieren autenticación
+router.use('/user-cvs', requireAuth, userCVRoutes);
+router.use('/admin', requireAuth, adminRoutes);
+router.use('/job-search', requireAuth, jobSearchRoutes);
+router.use('/cover-letters', requireAuth, coverLetterRoutes);
+router.use('/interview-questions', requireAuth, interviewQuestionRoutes);
+router.use('/interview-simulator', requireAuth, interviewSimulatorRoutes);
 
 module.exports = router;

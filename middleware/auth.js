@@ -8,7 +8,10 @@ exports.requireAuth = async (req, res, next) => {
     const token = req.cookies.token;
     
     if (!token) {
-      return res.status(401).json({ error: 'Acceso no autorizado. Por favor inicia sesión.' });
+      return res.status(401).json({ 
+        error: 'Acceso no autorizado. Por favor inicia sesión.',
+        requiresAuth: true  // Agregar esta bandera para el frontend
+      });
     }
     
     // Verificar token

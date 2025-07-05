@@ -5,6 +5,7 @@ const logger = require('../utils/logger');
 const config = require('../config');
 const { v4: uuidv4 } = require('uuid');
 const Payment = require('../models/Payment');
+const Subscription = require('../models/Subscription'); // Asegúrate de tener el modelo de Subscription importado
 const { Op } = require('sequelize');
 
 // Generar token JWT
@@ -302,27 +303,30 @@ exports.deleteAccount = async (req, res) => {
   }
 };
 
-// Añadir este método al controlador de autenticación
+// Añadir este método
 exports.checkSubscription = async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Buscar suscripción activa en la base de datos
-    const subscription = await Payment.findOne({
+    // Buscar suscripción activa
+    const subscription = await Subscription.findOne({
       where: {
         userId,
-        isSubscription: true,
-        status: 'approved',
-        subscriptionEndDate: {
+        status: 'active',
+        endDate: {
           [Op.gt]: new Date() // Fecha fin mayor que hoy
         }
       },
-      order: [['subscriptionEndDate', 'DESC']]
+      order: [['endDate', 'DESC']]
     });
     
+    // Si no hay suscripción pero el usuario es admin, considerarlo premium
+    const isPremium = !!subscription || req.user.role === 'admin';
+    
     return res.json({
-      active: !!subscription,
-      subscription: subscription || null
+      active: isPremium,
+      subscription: subscription || null,
+      isPremium
     });
   } catch (error) {
     console.error('Error al verificar suscripción:', error);

@@ -17,6 +17,14 @@ exports.createPreference = async (req, res) => {
   try {
     const { title, price, quantity, template, isSubscription, productType } = req.body;
     
+    // Verificar si el usuario está autenticado (para compras que lo requieren)
+    if (isSubscription && !req.user) {
+      return res.status(401).json({ 
+        error: 'Debes iniciar sesión para adquirir una suscripción',
+        requiresAuth: true 
+      });
+    }
+    
     // Validación básica
     if (!price) {
       return res.status(400).json({ error: 'Precio no válido' });
