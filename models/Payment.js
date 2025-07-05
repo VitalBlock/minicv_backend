@@ -58,6 +58,19 @@ const Payment = sequelize.define('Payment', {
   updatedAt: {
     type: DataTypes.DATE,
     defaultValue: DataTypes.NOW
+  },
+  productType: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  isSubscription: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  subscriptionEndDate: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, {
   tableName: 'payments',

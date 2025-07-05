@@ -15,11 +15,11 @@ mercadopago.configure({
 // Crear preferencia de pago
 exports.createPreference = async (req, res) => {
   try {
-    const { title, price, quantity, template } = req.body;
+    const { title, price, quantity, template, isSubscription, productType } = req.body;
     
-    logger.info('Creando preferencia de pago', { title, price, quantity, template });
-    console.log('Datos completos:', req.body);
-    console.log('Cookies:', req.cookies);
+    logger.info('Creando preferencia de pago', { 
+      title, price, quantity, template, isSubscription, productType 
+    });
     
     // Validar datos
     if (!title || !price || !quantity) {
@@ -39,30 +39,52 @@ exports.createPreference = async (req, res) => {
       });
     }
     
-    // Verificar si ya existe un pago aprobado con descargas disponibles
-    const existingPayment = await Payment.findOne({
-      where: {
+    // Si es una suscripción, manejarla diferente
+    if (isSubscription) {
+      // Referencia externa para suscripción
+      const externalReference = `${sessionId}-${productType || 'interview-pack'}`;
+      
+      // Crear preferencia de pago para suscripción
+      const preference = {
+        items: [{
+          title: title,
+          unit_price: parseInt(price),
+          quantity: parseInt(quantity)
+        }],
+        external_reference: externalReference,
+        back_urls: {
+          success: `${config.frontendUrl}/payment/success`,
+          failure: `${config.frontendUrl}/payment/failure`,
+          pending: `${config.frontendUrl}/payment/pending`
+        },
+        auto_return: 'approved',
+        notification_url: `${config.backendUrl}/api/mercadopago/webhook`,
+        metadata: {
+          product_type: productType || 'interview-pack',
+          is_subscription: true,
+          sessionId: sessionId
+        }
+      };
+      
+      // Crear preferencia en MercadoPago
+      const response = await mercadopago.preferences.create(preference);
+      
+      // Crear registro de pago pendiente
+      await Payment.create({
         sessionId: sessionId,
-        template: template,
-        status: 'approved',
-        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
-        // downloadsRemaining: { gt: 0 }
-      }
-    });
-    
-    if (existingPayment) {
-      logger.info('Usuario tiene descargas disponibles', { 
-        sessionId, 
-        template, 
-        downloads: existingPayment.downloadsRemaining 
+        mercadoPagoId: response.body.id,
+        amount: parseInt(price),
+        status: 'pending',
+        template: productType || 'interview-pack',
+        productType: productType || 'interview-pack',
+        isSubscription: true,
+        downloadsRemaining: 999 // Representando acceso ilimitado
       });
       
-      return res.status(200).json({ 
-        message: 'Tienes descargas disponibles',
-        hasPaid: true,
-        paymentId: existingPayment.mercadoPagoId,
-        downloadsRemaining: existingPayment.downloadsRemaining
-      });
+      logger.info('Preferencia de suscripción creada', { id: response.body.id });
+      
+      // Retornar la preferencia
+      return res.status(201).json(response.body);
     }
     
     // No hay descargas disponibles, crear nueva preferencia de pago
@@ -292,11 +314,23 @@ exports.handleWebhook = async (req, res) => {
       
       const payment = paymentInfo.body;
       const externalReference = payment.external_reference;
+      const metadata = payment.metadata || {};
       
       if (externalReference) {
-        const [sessionId, template] = externalReference.split('-');
+        let sessionId, template, isSubscription = false;
         
-        // Buscar o crear el registro de pago
+        // Verificar si es una suscripción por el formato de referencia
+        if (externalReference.includes('interview-pack') || 
+            externalReference.includes('cover-letter') || 
+            metadata.is_subscription) {
+          
+          [sessionId, template] = externalReference.split('-');
+          isSubscription = true;
+        } else {
+          [sessionId, template] = externalReference.split('-');
+        }
+        
+        // Actualizar o crear registro de pago
         const [paymentRecord, created] = await Payment.findOrCreate({
           where: { 
             mercadoPagoId: payment.id.toString()
@@ -307,7 +341,9 @@ exports.handleWebhook = async (req, res) => {
             amount: payment.transaction_amount,
             status: payment.status,
             template: template,
-            downloadsRemaining: 5 // 5 descargas por defecto
+            productType: metadata.product_type || template,
+            isSubscription: isSubscription,
+            downloadsRemaining: isSubscription ? 999 : 5
           }
         });
         
@@ -317,11 +353,11 @@ exports.handleWebhook = async (req, res) => {
           await paymentRecord.save();
         }
         
-        logger.info('Pago actualizado vía webhook', { 
-          id: payment.id, 
-          status: payment.status,
-          downloads: paymentRecord.downloadsRemaining
-        });
+        // Si el pago es aprobado y es para una suscripción, actualizar usuario
+        if (payment.status === 'approved' && isSubscription) {
+          // Encontrar al usuario por sessionId y actualizar su status
+          // (esto requiere implementación adicional)
+        }
       }
     }
     
