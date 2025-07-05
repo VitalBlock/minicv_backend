@@ -37,7 +37,7 @@ exports.createPreference = async (req, res) => {
       },
       auto_return: 'approved',
       statement_descriptor: 'MiniCV',
-      external_reference: isSubscription ? 'interview-pack' : template
+      external_reference: isSubscription ? 'premium-bundle' : template
     };
     
     // Crear preferencia directamente sin lógica compleja
@@ -49,7 +49,7 @@ exports.createPreference = async (req, res) => {
       mercadoPagoId: response.body.id,
       amount: parseInt(price),
       status: 'pending',
-      template: template || 'interview-pack',
+      template: isSubscription ? 'premium-bundle' : (template || 'professional'),
       isSubscription: !!isSubscription
     });
     
