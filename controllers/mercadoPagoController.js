@@ -22,7 +22,7 @@ exports.createPreference = async (req, res) => {
     });
     
     // Validar datos
-    if (!title || !price || !quantity) {
+    if (!title || !price) {
       return res.status(400).json({ error: 'Faltan datos requeridos' });
     }
     
@@ -39,154 +39,62 @@ exports.createPreference = async (req, res) => {
       });
     }
     
-    // Si es una suscripción, manejarla diferente
-    if (isSubscription) {
-      logger.info('Creando preferencia para suscripción', { productType });
-      
-      // Referencia externa para suscripción
-      const externalReference = `${sessionId}-${productType || 'interview-pack'}`;
-      
-      // Crear preferencia de pago para suscripción con URLs corregidas
-      const preference = {
-        items: [{
-          title: title || 'Pack Profesional de Entrevista',
-          unit_price: parseInt(price) || 15000,
-          quantity: parseInt(quantity) || 1,
-          currency_id: 'COP'
-        }],
-        external_reference: externalReference,
-        back_urls: {
-          success: `${config.frontendUrl}/payment/success`,
-          failure: `${config.frontendUrl}/payment/failure`,
-          pending: `${config.frontendUrl}/payment/pending`
-        },
-        auto_return: 'approved',
-        notification_url: `${config.backendUrl}/api/mercadopago/webhook`,
-        metadata: {
-          product_type: productType || 'interview-pack',
-          is_subscription: true,
-          sessionId: sessionId
-        }
-      };
-      
-      try {
-        logger.info('Enviando preferencia a MercadoPago', { preference });
-        const response = await mercadopago.preferences.create(preference);
-        
-        // Registrar en BD
-        await Payment.create({
-          sessionId: sessionId,
-          mercadoPagoId: response.body.id,
-          amount: parseInt(price) || 15000,
-          status: 'pending',
-          template: productType || 'interview-pack',
-          productType: productType || 'interview-pack',
-          isSubscription: true,
-          downloadsRemaining: 999 // Acceso ilimitado
-        });
-        
-        logger.info('Preferencia de suscripción creada', { 
-          id: response.body.id, 
-          init_point: response.body.init_point 
-        });
-        
-        return res.status(201).json({
-          id: response.body.id,
-          init_point: response.body.init_point,
-          sandbox_init_point: response.body.sandbox_init_point
-        });
-      } catch (mpError) {
-        logger.error('Error de MercadoPago al crear preferencia', mpError);
-        return res.status(500).json({
-          error: 'Error al crear preferencia de pago',
-          details: mpError.message
-        });
-      }
-    }
+    // Preparar datos base para la preferencia
+    const priceInteger = parseInt(price);
+    const quantityInteger = parseInt(quantity || 1);
+    const preferenceItems = [{
+      title: title,
+      unit_price: priceInteger,
+      quantity: quantityInteger,
+      currency_id: 'COP'
+    }];
     
-    // No hay descargas disponibles, crear nueva preferencia de pago
-    let priceInteger = parseInt(price);
-    let expectedPrice;
+    // Referencia externa para suscripción o compra única
+    const externalReference = isSubscription 
+      ? `${sessionId}-subscription-${productType || 'interview-pack'}`
+      : `${sessionId}-${template}`;
     
-    // Validar según el template
-    switch (template) {
-      case 'professional':
-        expectedPrice = 3000;
-        break;
-      case 'modern':
-      case 'creative':
-      case 'functional': // Añadir plantilla funcional
-        expectedPrice = 5000;
-        break;
-      case 'minimalist':
-        expectedPrice = 3000;
-        break;
-      case 'chronological':
-        expectedPrice = 5000;
-        break;
-      case 'executive':
-        expectedPrice = 7500;
-        break;
-      case 'international':
-      case 'academic':
-      case 'mixed': // Añadir plantilla mixta
-        expectedPrice = 6000;
-        break;
-      default:
-        expectedPrice = 3000; // Valor por defecto
-    }
+    // URLs de retorno
+    const backUrls = {
+      success: `${config.frontendUrl}/payment/mercadopago/success`,
+      failure: `${config.frontendUrl}/payment/mercadopago/failure`,
+      pending: `${config.frontendUrl}/payment/mercadopago/pending`
+    };
     
-    // En desarrollo, usar un precio bajo para pruebas
-    if (process.env.NODE_ENV !== 'production') {
-      expectedPrice = 5;
-    }
-    
-    if (priceInteger !== expectedPrice) {
-      logger.warn('Precio incorrecto para template', { 
-        template, 
-        received: priceInteger, 
-        expected: expectedPrice 
-      });
-      priceInteger = expectedPrice;
-    }
-    
-    // Referencia externa para identificar sesión y template
-    const externalReference = `${sessionId}-${template}`;
-    
-    // Crear preferencia de pago
+    // Crear preferencia base
     const preference = {
-      items: [{
-        title: title,
-        unit_price: priceInteger,
-        quantity: parseInt(quantity)
-      }],
+      items: preferenceItems,
       external_reference: externalReference,
-      back_urls: {
-        success: `${config.frontendUrl}/payment/success`,
-        failure: `${config.frontendUrl}/payment/failure`,
-        pending: `${config.frontendUrl}/payment/pending`
-      },
+      back_urls: backUrls,
       auto_return: 'approved',
-      notification_url: `${config.backendUrl}/api/mercadopago/webhook`
+      notification_url: `${config.backendUrl}/api/mercadopago/webhook`,
+      metadata: {
+        product_type: productType || template || 'interview-pack',
+        is_subscription: !!isSubscription,
+        sessionId: sessionId
+      }
     };
     
     // Crear preferencia en MercadoPago
     const response = await mercadopago.preferences.create(preference);
     
-    // Crear registro de pago pendiente
+    // Guardar registro en la base de datos
     await Payment.create({
       sessionId: sessionId,
       mercadoPagoId: response.body.id,
       amount: priceInteger,
       status: 'pending',
-      template: template,
-      downloadsRemaining: 5 // 5 descargas por defecto
+      template: productType || template || 'interview-pack',
+      productType: productType || template || 'interview-pack',
+      isSubscription: !!isSubscription,
+      downloadsRemaining: isSubscription ? 999 : 5
     });
     
-    logger.info('Preferencia creada exitosamente', { id: response.body.id });
-    
-    // Retornar la preferencia
-    return res.status(201).json(response.body);
+    return res.status(201).json({
+      id: response.body.id,
+      init_point: response.body.init_point,
+      sandbox_init_point: response.body.sandbox_init_point
+    });
   } catch (error) {
     logger.error('Error al crear preferencia', error);
     return res.status(500).json({ 
