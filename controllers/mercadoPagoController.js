@@ -8,6 +8,7 @@ const { sequelize } = require('../config/database');
 const { Op } = require('sequelize'); // Cambia esto
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const UserCV = require('../models/UserCV'); // Asegúrate de tener este modelo
 
 // Configuración de MercadoPago
 mercadopago.configure({
@@ -440,51 +441,60 @@ exports.createSubscriptionProxy = async (req, res) => {
 
 exports.registerPayment = async (req, res) => {
   try {
-    const { paymentId, status, template, amount } = req.body;
     const userId = req.user.id;
+    const { paymentId, status, template, amount, cvData } = req.body;
     
-    // Verificar si el pago ya existe
-    const existingPayment = await Payment.findOne({
-      where: { mercadoPagoId: paymentId }
-    });
-    
-    if (existingPayment) {
-      // Actualizar el pago existente
-      existingPayment.status = status;
-      await existingPayment.save();
-      
-      return res.status(200).json({
-        success: true,
-        message: 'Pago actualizado correctamente',
-        payment: existingPayment
-      });
-    } else {
-      // Crear nuevo registro de pago
-      const newPayment = await Payment.create({
-        userId,
-        mercadoPagoId: paymentId,
-        amount: parseFloat(amount),
-        status,
-        template,
-        sessionId: req.cookies.sessionId || `session_${Date.now()}`
-      });
-      
-      // Si el pago es para una suscripción, actualizar al usuario
-      if (template === 'premium-bundle' || template === 'interview-pack') {
-        const user = await User.findByPk(userId);
-        if (user) {
-          user.premium = true;
-          user.premiumUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 días
-          await user.save();
-        }
-      }
-      
-      return res.status(201).json({
-        success: true,
-        message: 'Pago registrado correctamente',
-        payment: newPayment
+    // Validar datos mínimos
+    if (!paymentId || !status) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Datos incompletos para registrar el pago' 
       });
     }
+    
+    // Registrar el pago en la base de datos
+    const newPayment = await Payment.create({
+      userId,
+      mercadoPagoId: paymentId,
+      status,
+      amount: amount || 0,
+      template,
+      downloadsRemaining: 5, // Establecer explícitamente 5 descargas
+      sessionId: req.cookies.sessionId || `session_${Date.now()}`
+    });
+    
+    // Si el pago es para una suscripción, actualizar al usuario
+    if (template === 'premium-bundle' || template === 'interview-pack') {
+      const user = await User.findByPk(userId);
+      if (user) {
+        user.premium = true;
+        user.premiumUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 días
+        await user.save();
+      }
+    }
+    
+    // Si el pago incluye datos del CV, guardarlo en el perfil del usuario
+    if (cvData && Object.keys(cvData).length > 0) {
+      try {
+        await UserCV.create({
+          userId,
+          name: `CV Premium - ${template || 'Profesional'}`,
+          template: template || 'professional',
+          cvData,
+          isPremium: true // Marcar como CV premium
+        });
+      } catch (cvError) {
+        console.error('Error al guardar CV premium:', cvError);
+        // Continuar aunque falle el guardado del CV
+      }
+    }
+    
+    return res.status(201).json({
+      success: true,
+      message: 'Pago registrado correctamente',
+      payment: newPayment,
+      downloadsRemaining: 5
+    });
   } catch (error) {
     console.error('Error al registrar pago:', error);
     return res.status(500).json({

@@ -34,6 +34,16 @@ const UserCV = sequelize.define('UserCV', {
   cvData: {
     type: DataTypes.JSON,
     allowNull: false
+  },
+  isPremium: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false
+  },
+  downloadsRemaining: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    defaultValue: 5
   }
 });
 
