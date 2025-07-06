@@ -19,33 +19,49 @@ exports.requireAuth = async (req, res, next) => {
     if (!finalToken) {
       return res.status(401).json({ 
         error: 'Acceso no autorizado. Por favor inicia sesión.',
-        requiresAuth: true  // Agregar esta bandera para el frontend
+        requiresAuth: true
       });
     }
     
-    // Verificar token
-    const decoded = jwt.verify(finalToken, process.env.JWT_SECRET);
-    
-    // Buscar usuario en la base de datos
-    const user = await User.findByPk(decoded.id);
-    
-    if (!user) {
-      return res.status(401).json({ error: 'Usuario no encontrado' });
+    // Verificar la validez del token
+    try {
+      const decoded = jwt.verify(finalToken, process.env.JWT_SECRET);
+      
+      // Verificar que el usuario existe en la base de datos
+      const user = await User.findByPk(decoded.id);
+      
+      if (!user) {
+        return res.status(401).json({ 
+          error: 'Usuario no encontrado. Por favor inicia sesión nuevamente.',
+          requiresAuth: true 
+        });
+      }
+      
+      // Asignar el usuario a req.user para uso en controladores
+      req.user = user;
+      
+      // Si el token vino del header y no hay cookie, establecer la cookie
+      if (headerToken && !token) {
+        res.cookie('token', headerToken, {
+          maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
+          httpOnly: true,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+        });
+      }
+      
+      next();
+    } catch (error) {
+      // El token es inválido o ha expirado
+      console.error('Error al verificar token:', error);
+      return res.status(401).json({ 
+        error: 'Sesión expirada. Por favor inicia sesión nuevamente.',
+        requiresAuth: true 
+      });
     }
-    
-    // Añadir usuario al objeto de solicitud para uso en otros middlewares
-    req.user = {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
-      premium: user.premium
-    };
-    
-    next();
   } catch (error) {
-    console.error('Error en autenticación:', error);
-    return res.status(401).json({ error: 'Token inválido o expirado' });
+    console.error('Error en middleware de autenticación:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
 

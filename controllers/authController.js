@@ -334,3 +334,23 @@ exports.checkSubscription = async (req, res) => {
     return res.status(500).json({ error: 'Error al verificar suscripción' });
   }
 };
+
+// Añadir esta función al final del archivo
+exports.checkSession = async (req, res) => {
+  try {
+    // Si llegamos aquí, significa que el middleware de autenticación pasó
+    // y req.user debe existir
+    return res.status(200).json({
+      authenticated: true,
+      user: {
+        id: req.user.id,
+        email: req.user.email,
+        name: req.user.name,
+        role: req.user.role
+      }
+    });
+  } catch (error) {
+    console.error('Error al verificar sesión:', error);
+    return res.status(500).json({ error: 'Error al verificar sesión' });
+  }
+};
