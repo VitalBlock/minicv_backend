@@ -104,7 +104,7 @@ exports.login = async (req, res) => {
     res.cookie('token', token, {
       maxAge: 30 * 24 * 60 * 60 * 1000, // 30 días
       httpOnly: true,
-      secure: true, // Siempre debe ser true cuando sameSite es 'none'
+      secure: true,
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
     });
     
@@ -117,12 +117,13 @@ exports.login = async (req, res) => {
       );
     }
     
-    // Responder con datos del usuario
+    // Incluir el token en la respuesta
     return res.status(200).json({
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role || 'user' // Asegurarse de incluir el rol
+      role: user.role,
+      token: token // Añadir el token aquí
     });
   } catch (error) {
     logger.error('Error en login de usuario', error);

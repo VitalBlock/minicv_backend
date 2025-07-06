@@ -4,10 +4,19 @@ const User = require('../models/User');
 // Middleware para verificar si el usuario está autenticado
 exports.requireAuth = async (req, res, next) => {
   try {
-    // Verificar si existe token en las cookies
+    // Verificar primero la cookie
     const token = req.cookies.token;
     
-    if (!token) {
+    // Si no hay cookie, verificar el encabezado de autorización
+    const authHeader = req.headers.authorization;
+    const headerToken = authHeader && authHeader.startsWith('Bearer ') 
+      ? authHeader.substring(7) 
+      : null;
+    
+    // Usar el token de la cookie o del encabezado
+    const finalToken = token || headerToken;
+    
+    if (!finalToken) {
       return res.status(401).json({ 
         error: 'Acceso no autorizado. Por favor inicia sesión.',
         requiresAuth: true  // Agregar esta bandera para el frontend
@@ -15,7 +24,7 @@ exports.requireAuth = async (req, res, next) => {
     }
     
     // Verificar token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const decoded = jwt.verify(finalToken, process.env.JWT_SECRET);
     
     // Buscar usuario en la base de datos
     const user = await User.findByPk(decoded.id);
