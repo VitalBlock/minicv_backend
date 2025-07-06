@@ -3,22 +3,31 @@ const config = require('../config');
 const User = require('../models/User');
 const logger = require('../utils/logger');
 
+// Cerca de la línea 36, modifica para imprimir más información de diagnóstico
 exports.protect = async (req, res, next) => {
   try {
     let token;
     
     // Obtener token de cookie
-    if (req.cookies.token) {
+    if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
+      console.log('Token encontrado en cookie');
     } 
     // O del encabezado Authorization
     else if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
       token = req.headers.authorization.split(' ')[1];
+      console.log('Token encontrado en header Authorization');
     }
     
     // Si no hay token
     if (!token) {
-      return res.status(401).json({ error: 'No autorizado, sin token' });
+      console.log('No se encontró token ni en cookies ni en headers');
+      console.log('Headers:', req.headers);
+      console.log('Cookies:', req.cookies);
+      return res.status(401).json({ 
+        error: 'No autorizado, sin token',
+        requiresAuth: true 
+      });
     }
     
     try {
@@ -39,7 +48,10 @@ exports.protect = async (req, res, next) => {
       next();
     } catch (error) {
       logger.error('Error al verificar token', error);
-      return res.status(401).json({ error: 'No autorizado, token inválido' });
+      return res.status(401).json({ 
+        error: 'No autorizado, token inválido',
+        requiresAuth: true 
+      });
     }
   } catch (error) {
     logger.error('Error en middleware de autenticación', error);

@@ -1,37 +1,32 @@
 const express = require('express');
-const { 
-    createPreference,
-    checkPayment,
-    handleWebhook,
-    checkUserPayment,
-    registerDownload,
-    getPublicKey,
-    checkUserPaymentGeneral,
-    initializeSession
-} = require('../controllers/mercadoPagoController');
-
 const router = express.Router();
+const mercadoPagoController = require('../controllers/mercadoPagoController');
+const { protect } = require('../middleware/authMiddleware');
+const { validatePreferenceData } = require('../middleware/validations');
 
 // Crear una preferencia de pago
-router.post('/create-preference', createPreference);
+router.post('/create-preference', protect, validatePreferenceData, mercadoPagoController.createPreference);
 
 // Verificar el estado de un pago
-router.get('/check-payment/:id', checkPayment);
+router.get('/check-payment/:id', mercadoPagoController.checkPayment);
 
 // Recibir notificaciones (webhook)
-router.post('/webhook', handleWebhook);
-router.get('/webhook', handleWebhook);
+router.post('/webhook', mercadoPagoController.handleWebhook);
+router.get('/webhook', mercadoPagoController.handleWebhook);
 
 // Obtener la clave pública
-router.get('/public-key', getPublicKey);
+router.get('/public-key', mercadoPagoController.getPublicKey);
 
 // Consultar el estado de un pago de usuario
-router.get('/user-payment/:template', checkUserPayment);
-router.get('/check-user-payment', checkUserPaymentGeneral);
+router.get('/user-payment/:template', mercadoPagoController.checkUserPayment);
+router.get('/check-user-payment', mercadoPagoController.checkUserPaymentGeneral);
 
 // Registrar una descarga
-router.post('/register-download/:template', registerDownload);
-router.post('/initialize-session', initializeSession);
+router.post('/register-download/:template', mercadoPagoController.registerDownload);
+router.post('/initialize-session', mercadoPagoController.initializeSession);
+
+// Crear una suscripción
+router.post('/create-subscription', mercadoPagoController.createSubscriptionProxy);
 
 // Probar configuración de Mercado Pago
 router.get('/test-config', (req, res) => {
@@ -45,6 +40,18 @@ router.get('/test-config', (req, res) => {
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+// Nueva ruta para verificar autenticación (útil para debugging)
+router.get('/check-auth', protect, (req, res) => {
+  res.json({ 
+    authenticated: true, 
+    user: {
+      id: req.user.id,
+      name: req.user.name,
+      role: req.user.role
+    }
+  });
 });
 
 module.exports = router;

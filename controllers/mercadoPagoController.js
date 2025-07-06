@@ -6,6 +6,8 @@ const { v4: uuidv4 } = require('uuid');
 const config = require('../config');
 const { sequelize } = require('../config/database');
 const { Op } = require('sequelize'); // Cambia esto
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
 
 // Configuración de MercadoPago
 mercadopago.configure({
@@ -317,5 +319,94 @@ exports.initializeSession = async (req, res) => {
   } catch (error) {
     logger.error('Error al inicializar sesión', error);
     return res.status(500).json({ error: 'Error al inicializar sesión' });
+  }
+};
+
+// Añadir este nuevo endpoint al final del archivo
+exports.createSubscriptionProxy = async (req, res) => {
+  try {
+    // Obtener el token directamente del header Authorization
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({
+        error: 'Token no proporcionado',
+        requiresAuth: true
+      });
+    }
+    
+    // Extraer el token
+    const token = authHeader.substring(7);
+    
+    // Validar el token manualmente
+    try {
+      const decoded = jwt.verify(token, config.jwtSecret);
+      
+      // Buscar el usuario directamente
+      const user = await User.findByPk(decoded.id);
+      
+      if (!user) {
+        return res.status(401).json({
+          error: 'Usuario no encontrado',
+          requiresAuth: true
+        });
+      }
+      
+      // Asignar el usuario al request
+      req.user = user;
+      
+      // Continuar con la creación de la preferencia
+      const { title, price } = req.body;
+      
+      // Configuración básica para la preferencia
+      const preferenceData = {
+        items: [{
+          title: title || 'Suscripción MiniCV',
+          unit_price: parseInt(price || 15000),
+          quantity: 1,
+          currency_id: 'COP'
+        }],
+        back_urls: {
+          success: `${config.frontendUrl}/payment/mercadopago/success`,
+          failure: `${config.frontendUrl}/payment/mercadopago/failure`,
+          pending: `${config.frontendUrl}/payment/mercadopago/pending`
+        },
+        auto_return: 'approved',
+        statement_descriptor: 'MiniCV Premium',
+        external_reference: 'premium-bundle'
+      };
+      
+      // Crear la preferencia
+      const response = await mercadopago.preferences.create(preferenceData);
+      
+      // Registrar en base de datos
+      await Payment.create({
+        userId: user.id,
+        sessionId: req.cookies.sessionId || `session_${Date.now()}`,
+        mercadoPagoId: response.body.id,
+        amount: parseInt(price || 15000),
+        status: 'pending',
+        template: 'premium-bundle',
+        isSubscription: true
+      });
+      
+      return res.status(201).json({
+        id: response.body.id,
+        init_point: response.body.init_point,
+        sandbox_init_point: response.body.sandbox_init_point
+      });
+      
+    } catch (tokenError) {
+      console.error('Error al verificar token:', tokenError);
+      return res.status(401).json({
+        error: 'Token inválido',
+        requiresAuth: true
+      });
+    }
+  } catch (error) {
+    console.error('Error en proxy de suscripción:', error);
+    return res.status(500).json({
+      error: 'Error al procesar la solicitud',
+      details: error.message
+    });
   }
 };
