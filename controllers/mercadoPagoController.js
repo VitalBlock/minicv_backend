@@ -17,6 +17,12 @@ exports.createPreference = async (req, res) => {
   try {
     const { title, price, quantity, template, isSubscription, productType } = req.body;
     
+    // Añadir estos logs de diagnóstico
+    console.log("Headers recibidos:", req.headers);
+    console.log("Cookies recibidas:", req.cookies);
+    console.log("Usuario autenticado:", req.user ? {id: req.user.id, email: req.user.email} : 'No autenticado');
+    console.log("Datos del body:", req.body);
+    
     // Verificar si el usuario está autenticado (para compras que lo requieren)
     if (isSubscription && !req.user) {
       return res.status(401).json({ 
