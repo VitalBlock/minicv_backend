@@ -217,6 +217,30 @@ exports.handleWebhook = async (req, res) => {
       }
       
       const payment = paymentInfo.body;
+      
+      // Buscar y actualizar el pago en la base de datos
+      const paymentRecord = await Payment.findOne({
+        where: { mercadoPagoId: payment.id.toString() }
+      });
+      
+      if (paymentRecord) {
+        // Actualizar el estado
+        const oldStatus = paymentRecord.status;
+        paymentRecord.status = payment.status;
+        await paymentRecord.save();
+        
+        // Si el pago pasó a estado aprobado, enviar correo
+        if (oldStatus !== 'approved' && payment.status === 'approved') {
+          // Aquí va la lógica de envío de correo
+          // sendPaymentConfirmationEmail(paymentRecord);
+          
+          // Si es suscripción, actualizar estado del usuario
+          if (paymentRecord.isSubscription) {
+            // Actualizar usuario con acceso premium
+          }
+        }
+      }
+      
       const externalReference = payment.external_reference;
       const metadata = payment.metadata || {};
       
