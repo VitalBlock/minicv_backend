@@ -54,4 +54,7 @@ router.get('/check-auth', protect, (req, res) => {
   });
 });
 
+// Registrar un pago
+router.post('/register-payment', protect, mercadoPagoController.registerPayment);
+
 module.exports = router;

@@ -41,9 +41,9 @@ exports.createPreference = async (req, res) => {
     // Configuración básica para la preferencia
     const preferenceData = {
       items: [{
-        title: title || 'Servicio MiniCV',
+        title: title || 'CV Premium',
         unit_price: parseInt(price),
-        quantity: parseInt(quantity || 1),
+        quantity: 1,
         currency_id: 'COP'
       }],
       back_urls: {
@@ -51,9 +51,9 @@ exports.createPreference = async (req, res) => {
         failure: `${config.frontendUrl}/payment/mercadopago/failure`,
         pending: `${config.frontendUrl}/payment/mercadopago/pending`
       },
+      notification_url: `${config.backendUrl}/api/mercadopago/webhook`, // Añadir esta línea
       auto_return: 'approved',
-      statement_descriptor: 'MiniCV',
-      external_reference: isSubscription ? 'premium-bundle' : template
+      statement_descriptor: 'MiniCV Premium'
     };
     
     // Crear preferencia directamente sin lógica compleja
@@ -394,6 +394,7 @@ exports.createSubscriptionProxy = async (req, res) => {
           failure: `${config.frontendUrl}/payment/mercadopago/failure`,
           pending: `${config.frontendUrl}/payment/mercadopago/pending`
         },
+        notification_url: `${config.backendUrl}/api/mercadopago/webhook`, // Añadir esta línea
         auto_return: 'approved',
         statement_descriptor: 'MiniCV Premium',
         external_reference: 'premium-bundle'
@@ -431,6 +432,64 @@ exports.createSubscriptionProxy = async (req, res) => {
     return res.status(500).json({
       error: 'Error al procesar la solicitud',
       details: error.message
+    });
+  }
+};
+
+// En mercadoPagoController.js - Agregar este nuevo método
+
+exports.registerPayment = async (req, res) => {
+  try {
+    const { paymentId, status, template, amount } = req.body;
+    const userId = req.user.id;
+    
+    // Verificar si el pago ya existe
+    const existingPayment = await Payment.findOne({
+      where: { mercadoPagoId: paymentId }
+    });
+    
+    if (existingPayment) {
+      // Actualizar el pago existente
+      existingPayment.status = status;
+      await existingPayment.save();
+      
+      return res.status(200).json({
+        success: true,
+        message: 'Pago actualizado correctamente',
+        payment: existingPayment
+      });
+    } else {
+      // Crear nuevo registro de pago
+      const newPayment = await Payment.create({
+        userId,
+        mercadoPagoId: paymentId,
+        amount: parseFloat(amount),
+        status,
+        template,
+        sessionId: req.cookies.sessionId || `session_${Date.now()}`
+      });
+      
+      // Si el pago es para una suscripción, actualizar al usuario
+      if (template === 'premium-bundle' || template === 'interview-pack') {
+        const user = await User.findByPk(userId);
+        if (user) {
+          user.premium = true;
+          user.premiumUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 días
+          await user.save();
+        }
+      }
+      
+      return res.status(201).json({
+        success: true,
+        message: 'Pago registrado correctamente',
+        payment: newPayment
+      });
+    }
+  } catch (error) {
+    console.error('Error al registrar pago:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error al registrar el pago'
     });
   }
 };
