@@ -354,3 +354,50 @@ exports.checkSession = async (req, res) => {
     return res.status(500).json({ error: 'Error al verificar sesión' });
   }
 };
+
+// Añadir esta función
+exports.refreshToken = async (req, res) => {
+  try {
+    // Verificar cookie del token
+    const token = req.cookies.token;
+    
+    if (!token) {
+      return res.status(401).json({ error: 'No hay sesión activa' });
+    }
+    
+    // Verificar y decodificar el token
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      const userId = decoded.id;
+      
+      // Verificar que el usuario existe
+      const user = await User.findByPk(userId);
+      
+      if (!user) {
+        return res.status(401).json({ error: 'Usuario no encontrado' });
+      }
+      
+      // Generar un nuevo token
+      const newToken = generateToken(user.id);
+      
+      // Establecer la cookie con el nuevo token
+      res.cookie('token', newToken, {
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax'
+      });
+      
+      // Devolver el token también en el cuerpo de la respuesta
+      return res.status(200).json({
+        success: true,
+        token: newToken
+      });
+    } catch (error) {
+      return res.status(401).json({ error: 'Token inválido o expirado' });
+    }
+  } catch (error) {
+    console.error('Error al refrescar token:', error);
+    return res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};

@@ -12,5 +12,6 @@ router.post('/logout', authController.logout);
 router.get('/me', requireAuth, authController.getCurrentUser);
 router.get('/subscription-status', requireAuth, authController.checkSubscription);
 router.get('/check-session', requireAuth, authController.checkSession); // Ahora con requireAuth
+router.post('/refresh-token', authController.refreshToken);
 
 module.exports = router;
