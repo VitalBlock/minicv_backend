@@ -571,22 +571,22 @@ exports.registerPayment = async (req, res) => {
   }
 };
 
-// Agregar este nuevo método
+// Modificar getUserPremiumTemplates para mayor precisión
 
 exports.getUserPremiumTemplates = async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Buscar todos los pagos aprobados Y pendientes del usuario
+    // Buscar solo los pagos APROBADOS del usuario
     const payments = await Payment.findAll({
       where: {
         userId,
-        status: {
-          [Op.in]: ['approved', 'pending']
-        }
+        status: 'approved'  // Solo mostrar los aprobados
       },
       order: [['createdAt', 'DESC']]
     });
+    
+    console.log(`Encontrados ${payments.length} pagos aprobados para el usuario ${userId}`);
     
     // Transformar los pagos en un formato más amigable
     const templates = payments.map(payment => ({
@@ -595,7 +595,7 @@ exports.getUserPremiumTemplates = async (req, res) => {
       downloadsRemaining: payment.downloadsRemaining || 5,
       purchaseDate: payment.createdAt,
       isSubscription: payment.isSubscription || false,
-      status: payment.status // Incluir el estado para que el frontend pueda mostrarlo
+      status: payment.status
     }));
     
     return res.status(200).json({
@@ -691,58 +691,64 @@ exports.activatePendingPayments = async (req, res) => {
       });
     }
     
-    // Activar todos los pagos pendientes
+    // Activar solo pagos confirmados en MercadoPago
     const activatedPayments = [];
     let errorOccurred = false;
     
     for (const payment of pendingPayments) {
       try {
-        payment.status = 'approved';
-        await payment.save();
-        console.log(`Pago ${payment.id} activado correctamente`);
-        activatedPayments.push({
-          id: payment.id,
-          template: payment.template,
-          amount: payment.amount
-        });
+        // Verificar con MercadoPago si el pago realmente se completó
+        if (payment.mercadoPagoId) {
+          try {
+            const mpPayment = await mercadopago.payment.get(payment.mercadoPagoId);
+            
+            // Solo activar si MercadoPago confirma que está aprobado
+            if (mpPayment.response.status === 'approved') {
+              payment.status = 'approved';
+              await payment.save();
+              console.log(`Pago ${payment.id} activado correctamente (verificado con MercadoPago)`);
+              activatedPayments.push({
+                id: payment.id,
+                template: payment.template,
+                amount: payment.amount
+              });
+            } else {
+              console.log(`Pago ${payment.id} no activado: estado en MercadoPago = ${mpPayment.response.status}`);
+            }
+          } catch (mpError) {
+            console.error(`Error al verificar pago ${payment.id} en MercadoPago:`, mpError);
+            errorOccurred = true;
+          }
+        } else {
+          console.log(`Pago ${payment.id} no tiene ID de MercadoPago, no se puede verificar`);
+        }
       } catch (saveError) {
         errorOccurred = true;
         console.error(`Error al activar pago ${payment.id}:`, saveError);
       }
     }
     
-    // Intentar actualizar el estado premium del usuario
-    try {
-      if (activatedPayments.length > 0) {
-        // Verificar si la tabla tiene la columna premium antes de actualizarla
-        const hasColumns = await sequelize.query(
-          "SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name IN ('premium', 'premiumUntil')",
-          { type: sequelize.QueryTypes.SELECT }
+    // Intentar actualizar el estado premium del usuario si se activó algún pago
+    if (activatedPayments.length > 0) {
+      try {
+        // Actualizar estado premium del usuario
+        await User.update(
+          {
+            premium: true,
+            premiumUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 días
+          },
+          { where: { id: userId } }
         );
-        
-        const columnNames = hasColumns.map(col => col.column_name);
-        
-        if (columnNames.includes('premium') && columnNames.includes('premiumUntil')) {
-          await User.update(
-            {
-              premium: true,
-              premiumUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 días
-            },
-            { where: { id: userId } }
-          );
-          console.log(`Estado premium actualizado para usuario ${userId}`);
-        } else {
-          console.log(`No se encontraron las columnas premium/premiumUntil en la tabla users`);
-        }
+        console.log(`Estado premium actualizado para usuario ${userId}`);
+      } catch (userUpdateError) {
+        console.error(`Error al actualizar estado premium del usuario ${userId}:`, userUpdateError);
       }
-    } catch (userUpdateError) {
-      console.error(`Error al actualizar estado premium del usuario ${userId}:`, userUpdateError);
     }
     
     return res.status(200).json({
       success: true,
       message: `${activatedPayments.length} pagos activados correctamente` + 
-               (errorOccurred ? " (algunos pagos no pudieron activarse)" : ""),
+               (errorOccurred ? " (algunos pagos no pudieron verificarse)" : ""),
       activatedPayments
     });
   } catch (error) {
