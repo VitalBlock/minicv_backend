@@ -577,12 +577,12 @@ exports.getUserPremiumTemplates = async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Buscar todos los pagos aprobados Y pendientes del usuario (temporalmente)
+    // Buscar todos los pagos aprobados Y pendientes del usuario
     const payments = await Payment.findAll({
       where: {
         userId,
         status: {
-          [Op.in]: ['approved', 'pending'] // Incluir pagos pendientes temporalmente
+          [Op.in]: ['approved', 'pending']
         }
       },
       order: [['createdAt', 'DESC']]
