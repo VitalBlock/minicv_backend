@@ -622,18 +622,16 @@ exports.checkUserPayments = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
     
-    // Obtener usuario sin depender de la columna premium
+    // Obtener datos básicos del usuario sin depender de columnas que pueden no existir
     const user = await User.findByPk(userId, {
       attributes: ['id', 'name', 'email']
     });
     
     if (!user) {
-      return res.status(404).json({
-        error: 'Usuario no encontrado'
-      });
+      return res.status(404).json({ error: 'Usuario no encontrado' });
     }
     
-    // Calcular estado premium basado en pagos aprobados
+    // Determinar si es premium basado en los pagos aprobados
     const hasApprovedPayment = payments.some(p => p.status === 'approved');
     
     return res.status(200).json({
@@ -641,7 +639,7 @@ exports.checkUserPayments = async (req, res) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        // Generar valores en lugar de leerlos de la DB
+        // Generar estas propiedades en vez de leerlas de la DB
         premium: hasApprovedPayment,
         premiumUntil: hasApprovedPayment ? new Date(Date.now() + 30*24*60*60*1000) : null
       },
@@ -657,9 +655,7 @@ exports.checkUserPayments = async (req, res) => {
     });
   } catch (error) {
     console.error('Error al verificar pagos:', error);
-    return res.status(500).json({
-      error: 'Error al verificar pagos'
-    });
+    return res.status(500).json({ error: 'Error al verificar pagos' });
   }
 };
 
