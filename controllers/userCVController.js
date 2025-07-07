@@ -1,5 +1,7 @@
 const UserCV = require('../models/UserCV');
+const Payment = require('../models/Payment'); // Asegúrate de importar el modelo de Payment
 const logger = require('../utils/logger');
+const { Op } = require('sequelize');
 
 // Guardar un nuevo CV
 exports.saveCV = async (req, res) => {
@@ -112,5 +114,63 @@ exports.deleteCV = async (req, res) => {
   } catch (error) {
     logger.error('Error al eliminar CV', error);
     return res.status(500).json({ error: 'Error al eliminar el CV' });
+  }
+};
+
+// Actualizar la plantilla de un CV existente
+exports.applyTemplate = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { id } = req.params;
+    const { template } = req.body;
+    
+    if (!template) {
+      return res.status(400).json({ error: 'Plantilla no especificada' });
+    }
+    
+    // Verificar si el usuario tiene esta plantilla premium
+    const payment = await Payment.findOne({
+      where: {
+        userId,
+        template,
+        status: 'approved',
+        downloadsRemaining: { [Op.gt]: 0 }
+      }
+    });
+    
+    if (!payment) {
+      return res.status(403).json({ 
+        error: 'No tienes esta plantilla premium disponible' 
+      });
+    }
+    
+    // Buscar el CV
+    const cv = await UserCV.findOne({
+      where: { id, userId }
+    });
+    
+    if (!cv) {
+      return res.status(404).json({ error: 'CV no encontrado' });
+    }
+    
+    // Actualizar la plantilla
+    cv.template = template;
+    cv.isPremium = true;
+    await cv.save();
+    
+    // Decrementar el contador de descargas
+    payment.downloadsRemaining -= 1;
+    await payment.save();
+    
+    return res.status(200).json({
+      success: true,
+      message: 'Plantilla aplicada correctamente',
+      cv
+    });
+  } catch (error) {
+    logger.error('Error al aplicar plantilla a CV', error);
+    return res.status(500).json({ 
+      error: 'Error al aplicar plantilla a CV' 
+    });
   }
 };

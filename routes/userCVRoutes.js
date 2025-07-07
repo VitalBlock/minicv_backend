@@ -12,5 +12,6 @@ router.get('/', userCVController.getUserCVs);
 router.get('/:id', userCVController.getCV);
 router.put('/:id', userCVController.updateCV);
 router.delete('/:id', userCVController.deleteCV);
+router.put('/:id/apply-template', authMiddleware, userCVController.applyTemplate);
 
 module.exports = router;
