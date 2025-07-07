@@ -20,6 +20,7 @@ router.get('/public-key', mercadoPagoController.getPublicKey);
 // Consultar el estado de un pago de usuario
 router.get('/user-payment/:template', mercadoPagoController.checkUserPayment);
 router.get('/check-user-payment', mercadoPagoController.checkUserPaymentGeneral);
+router.get('/check-user-payments', protect, mercadoPagoController.checkUserPayments);
 
 // Registrar una descarga
 router.post('/register-download/:template', mercadoPagoController.registerDownload);
@@ -59,5 +60,8 @@ router.post('/register-payment', protect, mercadoPagoController.registerPayment)
 
 // Obtener plantillas premium del usuario
 router.get('/user-premium-templates', protect, mercadoPagoController.getUserPremiumTemplates);
+
+// Activar pagos pendientes
+router.post('/activate-pending-payments', protect, mercadoPagoController.activatePendingPayments);
 
 module.exports = router;

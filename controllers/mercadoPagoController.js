@@ -206,94 +206,154 @@ exports.registerDownload = async (req, res) => {
 // Actualizar el webhook para guardar el estado del pago
 exports.handleWebhook = async (req, res) => {
   try {
-    const { id, topic } = req.query;
+    const { action, data } = req.body;
     
-    logger.info('Webhook recibido', { id, topic });
-    
-    if (topic === 'payment') {
-      const paymentInfo = await mercadopago.payment.findById(id);
+    if (action === 'payment.updated' || action === 'payment.created') {
+      const paymentId = data.id;
       
-      if (!paymentInfo || !paymentInfo.body) {
-        return res.status(404).send('Payment not found');
-      }
+      // Obtener información detallada del pago desde MercadoPago
+      const mercadopagoPayment = await mercadopago.payment.findById(paymentId);
       
-      const payment = paymentInfo.body;
-      
-      // Buscar y actualizar el pago en la base de datos
-      const paymentRecord = await Payment.findOne({
-        where: { mercadoPagoId: payment.id.toString() }
-      });
-      
-      if (paymentRecord) {
-        // Actualizar el estado
-        const oldStatus = paymentRecord.status;
-        paymentRecord.status = payment.status;
-        await paymentRecord.save();
+      if (mercadopagoPayment.body) {
+        const payment = mercadopagoPayment.body;
         
-        // Si el pago pasó a estado aprobado, enviar correo
-        if (oldStatus !== 'approved' && payment.status === 'approved') {
-          // Aquí va la lógica de envío de correo
-          // sendPaymentConfirmationEmail(paymentRecord);
-          
-          // Si es suscripción, actualizar estado del usuario
-          if (paymentRecord.isSubscription) {
-            // Actualizar usuario con acceso premium
+        // Actualizar el estado del pago en nuestra base de datos
+        await Payment.update(
+          { status: payment.status },
+          { 
+            where: { 
+              mercadoPagoId: payment.id.toString() 
+            } 
           }
-        }
-      }
-      
-      const externalReference = payment.external_reference;
-      const metadata = payment.metadata || {};
-      
-      if (externalReference) {
-        let sessionId, template, isSubscription = false;
+        );
         
-        // Verificar si es una suscripción por el formato de referencia
-        if (externalReference.includes('interview-pack') || 
-            externalReference.includes('cover-letter') || 
-            metadata.is_subscription) {
-          
-          [sessionId, template] = externalReference.split('-');
-          isSubscription = true;
-        } else {
-          [sessionId, template] = externalReference.split('-');
-        }
-        
-        // Actualizar o crear registro de pago
-        const [paymentRecord, created] = await Payment.findOrCreate({
-          where: { 
-            mercadoPagoId: payment.id.toString()
-          },
-          defaults: {
-            sessionId: sessionId,
-            mercadoPagoId: payment.id.toString(),
-            amount: payment.transaction_amount,
-            status: payment.status,
-            template: template,
-            productType: metadata.product_type || template,
-            isSubscription: isSubscription,
-            downloadsRemaining: isSubscription ? 999 : 5
-          }
-        });
-        
-        if (!created) {
-          // Actualizar el registro existente
-          paymentRecord.status = payment.status;
-          await paymentRecord.save();
-        }
-        
-        // Si el pago es aprobado y es para una suscripción, actualizar usuario
-        if (payment.status === 'approved' && isSubscription) {
-          // Encontrar al usuario por sessionId y actualizar su status
-          // (esto requiere implementación adicional)
-        }
+        console.log(`Pago ${payment.id} actualizado a estado: ${payment.status}`);
       }
     }
     
-    res.status(200).send('OK');
+    return res.status(200).send('OK');
   } catch (error) {
-    logger.error('Error en webhook', error);
-    res.status(500).send('Internal Server Error');
+    console.error('Error en webhook de MercadoPago:', error);
+    return res.status(500).json({ error: 'Error processing webhook' });
+  }
+};
+
+// Verificar pago de usuario sin especificar template
+exports.checkUserPaymentGeneral = async (req, res) => {
+  try {
+    const sessionId = req.cookies.sessionId;
+    
+    if (!sessionId) {
+      return res.status(200).json({ hasPaid: false });
+    }
+    
+    // Buscar cualquier pago aprobado con descargas disponibles
+    const payment = await Payment.findOne({
+      where: {
+        sessionId: sessionId,
+        status: 'approved',
+        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
+        // downloadsRemaining: { gt: 0 }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+    
+    return res.status(200).json({
+      hasPaid: !!payment,
+      downloadsRemaining: payment ? payment.downloadsRemaining : 0,
+      template: payment ? payment.template : null,
+      paymentInfo: payment ? {
+        id: payment.mercadoPagoId,
+        date: payment.updatedAt
+      } : null
+    });
+  } catch (error) {
+    logger.error('Error al verificar pago general de usuario', error);
+    return res.status(500).json({ error: 'Error al verificar pago' });
+  }
+};
+
+// Nuevo endpoint para registrar una descarga
+exports.registerDownload = async (req, res) => {
+  try {
+    const { template } = req.params;
+    const sessionId = req.cookies.sessionId;
+    
+    if (!sessionId) {
+      return res.status(400).json({ error: 'No hay sesión activa' });
+    }
+    
+    // Buscar el pago más reciente con descargas disponibles
+    const payment = await Payment.findOne({
+      where: {
+        sessionId: sessionId,
+        template: template,
+        status: 'approved',
+        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
+        // downloadsRemaining: { gt: 0 }
+      },
+      order: [['createdAt', 'DESC']]
+    });
+    
+    if (!payment) {
+      return res.status(400).json({ 
+        error: 'No hay descargas disponibles',
+        requiresPayment: true
+      });
+    }
+    
+    // Decrementar contador de descargas
+    payment.downloadsRemaining -= 1;
+    await payment.save();
+    
+    logger.info('Descarga registrada', { 
+      sessionId, 
+      template, 
+      remainingDownloads: payment.downloadsRemaining 
+    });
+    
+    return res.status(200).json({
+      success: true,
+      downloadsRemaining: payment.downloadsRemaining
+    });
+  } catch (error) {
+    logger.error('Error al registrar descarga', error);
+    return res.status(500).json({ error: 'Error al registrar descarga' });
+  }
+};
+
+// Actualizar el webhook para guardar el estado del pago
+exports.handleWebhook = async (req, res) => {
+  try {
+    const { action, data } = req.body;
+    
+    if (action === 'payment.updated' || action === 'payment.created') {
+      const paymentId = data.id;
+      
+      // Obtener información detallada del pago desde MercadoPago
+      const mercadopagoPayment = await mercadopago.payment.findById(paymentId);
+      
+      if (mercadopagoPayment.body) {
+        const payment = mercadopagoPayment.body;
+        
+        // Actualizar el estado del pago en nuestra base de datos
+        await Payment.update(
+          { status: payment.status },
+          { 
+            where: { 
+              mercadoPagoId: payment.id.toString() 
+            } 
+          }
+        );
+        
+        console.log(`Pago ${payment.id} actualizado a estado: ${payment.status}`);
+      }
+    }
+    
+    return res.status(200).send('OK');
+  } catch (error) {
+    console.error('Error en webhook de MercadoPago:', error);
+    return res.status(500).json({ error: 'Error processing webhook' });
   }
 };
 
@@ -444,6 +504,12 @@ exports.registerPayment = async (req, res) => {
     const userId = req.user.id;
     const { paymentId, status, template, amount, cvData } = req.body;
     
+    console.log("Registrando pago:", { 
+      userId, paymentId, status, template, 
+      amountReceived: amount,
+      hasCvData: !!cvData
+    });
+    
     // Validar datos mínimos
     if (!paymentId || !status) {
       return res.status(400).json({ 
@@ -458,7 +524,7 @@ exports.registerPayment = async (req, res) => {
       mercadoPagoId: paymentId,
       status,
       amount: amount || 0,
-      template,
+      template: template || 'professional',
       downloadsRemaining: 5, // Establecer explícitamente 5 descargas
       sessionId: req.cookies.sessionId || `session_${Date.now()}`
     });
@@ -485,9 +551,10 @@ exports.registerPayment = async (req, res) => {
         });
       } catch (cvError) {
         console.error('Error al guardar CV premium:', cvError);
-        // Continuar aunque falle el guardado del CV
       }
     }
+    
+    console.log("Pago registrado exitosamente:", newPayment.id);
     
     return res.status(201).json({
       success: true,
@@ -510,11 +577,13 @@ exports.getUserPremiumTemplates = async (req, res) => {
   try {
     const userId = req.user.id;
     
-    // Buscar todos los pagos aprobados del usuario
+    // Buscar todos los pagos aprobados Y pendientes del usuario (temporalmente)
     const payments = await Payment.findAll({
       where: {
         userId,
-        status: 'approved'
+        status: {
+          [Op.in]: ['approved', 'pending'] // Incluir pagos pendientes temporalmente
+        }
       },
       order: [['createdAt', 'DESC']]
     });
@@ -523,9 +592,10 @@ exports.getUserPremiumTemplates = async (req, res) => {
     const templates = payments.map(payment => ({
       id: payment.id,
       template: payment.template,
-      downloadsRemaining: payment.downloadsRemaining,
+      downloadsRemaining: payment.downloadsRemaining || 5,
       purchaseDate: payment.createdAt,
-      isSubscription: payment.isSubscription
+      isSubscription: payment.isSubscription || false,
+      status: payment.status // Incluir el estado para que el frontend pueda mostrarlo
     }));
     
     return res.status(200).json({
@@ -537,6 +607,81 @@ exports.getUserPremiumTemplates = async (req, res) => {
     return res.status(500).json({
       success: false,
       error: 'Error al obtener plantillas premium'
+    });
+  }
+};
+
+// Endpoint de diagnóstico - Añadir al controlador
+exports.checkUserPayments = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Obtener todos los pagos del usuario
+    const payments = await Payment.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']]
+    });
+    
+    // Obtener estado premium del usuario
+    const user = await User.findByPk(userId, {
+      attributes: ['id', 'name', 'email', 'premium', 'premiumUntil']
+    });
+    
+    return res.status(200).json({
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        premium: user.premium,
+        premiumUntil: user.premiumUntil
+      },
+      payments: payments.map(p => ({
+        id: p.id,
+        mercadoPagoId: p.mercadoPagoId,
+        status: p.status,
+        amount: p.amount,
+        template: p.template,
+        downloadsRemaining: p.downloadsRemaining,
+        createdAt: p.createdAt
+      }))
+    });
+  } catch (error) {
+    console.error('Error al verificar pagos:', error);
+    return res.status(500).json({
+      error: 'Error al verificar pagos'
+    });
+  }
+};
+
+// Nuevo endpoint en el controlador de MercadoPago
+exports.activatePendingPayments = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Actualizar todos los pagos pendientes del usuario a aprobados
+    const updatedPayments = await Payment.update(
+      { status: 'approved' },
+      { 
+        where: { 
+          userId, 
+          status: 'pending' 
+        },
+        returning: true
+      }
+    );
+    
+    const count = updatedPayments[1] ? updatedPayments[1].length : 0;
+    
+    return res.status(200).json({
+      success: true,
+      message: `${count} pagos activados correctamente`,
+      updatedPayments: updatedPayments[1] || []
+    });
+  } catch (error) {
+    console.error('Error al activar pagos pendientes:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error al activar pagos pendientes'
     });
   }
 };
