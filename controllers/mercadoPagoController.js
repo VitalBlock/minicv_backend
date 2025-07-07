@@ -503,3 +503,40 @@ exports.registerPayment = async (req, res) => {
     });
   }
 };
+
+// Agregar este nuevo método
+
+exports.getUserPremiumTemplates = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    
+    // Buscar todos los pagos aprobados del usuario
+    const payments = await Payment.findAll({
+      where: {
+        userId,
+        status: 'approved'
+      },
+      order: [['createdAt', 'DESC']]
+    });
+    
+    // Transformar los pagos en un formato más amigable
+    const templates = payments.map(payment => ({
+      id: payment.id,
+      template: payment.template,
+      downloadsRemaining: payment.downloadsRemaining,
+      purchaseDate: payment.createdAt,
+      isSubscription: payment.isSubscription
+    }));
+    
+    return res.status(200).json({
+      success: true,
+      templates
+    });
+  } catch (error) {
+    console.error('Error al obtener plantillas premium:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error al obtener plantillas premium'
+    });
+  }
+};

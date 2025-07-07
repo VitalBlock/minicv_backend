@@ -57,4 +57,7 @@ router.get('/check-auth', protect, (req, res) => {
 // Registrar un pago
 router.post('/register-payment', protect, mercadoPagoController.registerPayment);
 
+// Obtener plantillas premium del usuario
+router.get('/user-premium-templates', protect, mercadoPagoController.getUserPremiumTemplates);
+
 module.exports = router;
