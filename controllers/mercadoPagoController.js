@@ -622,18 +622,28 @@ exports.checkUserPayments = async (req, res) => {
       order: [['createdAt', 'DESC']]
     });
     
-    // Obtener estado premium del usuario
+    // Obtener usuario sin depender de la columna premium
     const user = await User.findByPk(userId, {
-      attributes: ['id', 'name', 'email', 'premium', 'premiumUntil']
+      attributes: ['id', 'name', 'email']
     });
+    
+    if (!user) {
+      return res.status(404).json({
+        error: 'Usuario no encontrado'
+      });
+    }
+    
+    // Calcular estado premium basado en pagos aprobados
+    const hasApprovedPayment = payments.some(p => p.status === 'approved');
     
     return res.status(200).json({
       user: {
         id: user.id,
         name: user.name,
         email: user.email,
-        premium: user.premium,
-        premiumUntil: user.premiumUntil
+        // Generar valores en lugar de leerlos de la DB
+        premium: hasApprovedPayment,
+        premiumUntil: hasApprovedPayment ? new Date(Date.now() + 30*24*60*60*1000) : null
       },
       payments: payments.map(p => ({
         id: p.id,
@@ -656,32 +666,95 @@ exports.checkUserPayments = async (req, res) => {
 // Nuevo endpoint en el controlador de MercadoPago
 exports.activatePendingPayments = async (req, res) => {
   try {
+    if (!req.user || !req.user.id) {
+      return res.status(401).json({
+        success: false,
+        error: 'Usuario no autenticado'
+      });
+    }
+    
     const userId = req.user.id;
     
-    // Actualizar todos los pagos pendientes del usuario a aprobados
-    const updatedPayments = await Payment.update(
-      { status: 'approved' },
-      { 
-        where: { 
-          userId, 
-          status: 'pending' 
-        },
-        returning: true
-      }
-    );
+    console.log(`Intentando activar pagos pendientes para usuario ${userId}`);
     
-    const count = updatedPayments[1] ? updatedPayments[1].length : 0;
+    // Buscar todos los pagos pendientes del usuario
+    const pendingPayments = await Payment.findAll({
+      where: {
+        userId,
+        status: 'pending'
+      }
+    });
+    
+    console.log(`Encontrados ${pendingPayments.length} pagos pendientes`);
+    
+    if (pendingPayments.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'No hay pagos pendientes para activar',
+        activatedPayments: []
+      });
+    }
+    
+    // Activar todos los pagos pendientes
+    const activatedPayments = [];
+    let errorOccurred = false;
+    
+    for (const payment of pendingPayments) {
+      try {
+        payment.status = 'approved';
+        await payment.save();
+        console.log(`Pago ${payment.id} activado correctamente`);
+        activatedPayments.push({
+          id: payment.id,
+          template: payment.template,
+          amount: payment.amount
+        });
+      } catch (saveError) {
+        errorOccurred = true;
+        console.error(`Error al activar pago ${payment.id}:`, saveError);
+      }
+    }
+    
+    // Intentar actualizar el estado premium del usuario
+    try {
+      if (activatedPayments.length > 0) {
+        // Verificar si la tabla tiene la columna premium antes de actualizarla
+        const hasColumns = await sequelize.query(
+          "SELECT column_name FROM information_schema.columns WHERE table_name = 'users' AND column_name IN ('premium', 'premiumUntil')",
+          { type: sequelize.QueryTypes.SELECT }
+        );
+        
+        const columnNames = hasColumns.map(col => col.column_name);
+        
+        if (columnNames.includes('premium') && columnNames.includes('premiumUntil')) {
+          await User.update(
+            {
+              premium: true,
+              premiumUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 días
+            },
+            { where: { id: userId } }
+          );
+          console.log(`Estado premium actualizado para usuario ${userId}`);
+        } else {
+          console.log(`No se encontraron las columnas premium/premiumUntil en la tabla users`);
+        }
+      }
+    } catch (userUpdateError) {
+      console.error(`Error al actualizar estado premium del usuario ${userId}:`, userUpdateError);
+    }
     
     return res.status(200).json({
       success: true,
-      message: `${count} pagos activados correctamente`,
-      updatedPayments: updatedPayments[1] || []
+      message: `${activatedPayments.length} pagos activados correctamente` + 
+               (errorOccurred ? " (algunos pagos no pudieron activarse)" : ""),
+      activatedPayments
     });
   } catch (error) {
     console.error('Error al activar pagos pendientes:', error);
     return res.status(500).json({
       success: false,
-      error: 'Error al activar pagos pendientes'
+      error: 'Error al activar pagos pendientes',
+      details: error.message
     });
   }
 };
