@@ -174,3 +174,57 @@ exports.applyTemplate = async (req, res) => {
     });
   }
 };
+
+// Añadir esta función al controlador
+
+// Obtener los datos de un CV por plantilla
+exports.getCVByTemplate = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { template } = req.params;
+    
+    if (!template) {
+      return res.status(400).json({ error: 'Plantilla no especificada' });
+    }
+    
+    // Buscar CV con esta plantilla
+    const cv = await UserCV.findOne({
+      where: { 
+        userId,
+        template
+      },
+      order: [['updatedAt', 'DESC']] // Obtener el más reciente
+    });
+    
+    if (!cv) {
+      // Si no hay un CV con esa plantilla, crear uno nuevo con datos genéricos
+      return res.status(200).json({
+        success: true,
+        data: {
+          personalInfo: {
+            name: "Tu Nombre",
+            title: "Tu Profesión",
+            email: "email@ejemplo.com",
+            phone: "123456789",
+            location: "Tu Ciudad"
+          },
+          sections: {
+            experience: [],
+            education: [],
+            skills: []
+          }
+        }
+      });
+    }
+    
+    return res.status(200).json({
+      success: true,
+      data: cv.cvData
+    });
+  } catch (error) {
+    console.error('Error al obtener CV por plantilla:', error);
+    return res.status(500).json({ 
+      error: 'Error al obtener CV por plantilla' 
+    });
+  }
+};

@@ -14,4 +14,7 @@ router.put('/:id', userCVController.updateCV);
 router.delete('/:id', userCVController.deleteCV);
 router.put('/:id/apply-template', protect, userCVController.applyTemplate);
 
+// Obtener CV por plantilla
+router.get('/by-template/:template', protect, userCVController.getCVByTemplate);
+
 module.exports = router;
