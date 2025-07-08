@@ -64,4 +64,7 @@ router.get('/user-premium-templates', protect, mercadoPagoController.getUserPrem
 // Activar pagos pendientes
 router.post('/activate-pending-payments', protect, mercadoPagoController.activatePendingPayments);
 
+// Añadir esta ruta junto a las otras rutas
+router.post('/create-test-payment', protect, mercadoPagoController.createTestPayment);
+
 module.exports = router;

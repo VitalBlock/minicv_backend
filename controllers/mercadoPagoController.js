@@ -760,3 +760,53 @@ exports.activatePendingPayments = async (req, res) => {
     });
   }
 };
+// Añadir este controlador al final del archivo
+
+exports.createTestPayment = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { template = 'professional', amount = 3000 } = req.body;
+    
+    console.log(`Creando pago de prueba para usuario ${userId}, plantilla ${template}`);
+    
+    // Crear un pago de prueba con estado aprobado
+    const payment = await Payment.create({
+      userId,
+      sessionId: `test_session_${Date.now()}`,
+      mercadoPagoId: `test_mp_${Date.now()}`,
+      amount: amount,
+      status: 'approved',
+      template: template,
+      downloadsRemaining: 5,
+      purchaseDate: new Date()
+    });
+    
+    // Actualizar el estado premium del usuario
+    await User.update(
+      {
+        premium: true,
+        premiumUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 días
+      },
+      { where: { id: userId } }
+    );
+    
+    console.log(`Pago de prueba creado con ID ${payment.id}`);
+    
+    return res.status(201).json({
+      success: true,
+      message: 'Pago de prueba creado con éxito',
+      payment: {
+        id: payment.id,
+        template: payment.template,
+        status: payment.status,
+        downloadsRemaining: payment.downloadsRemaining
+      }
+    });
+  } catch (error) {
+    console.error('Error al crear pago de prueba:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Error al crear pago de prueba'
+    });
+  }
+};
