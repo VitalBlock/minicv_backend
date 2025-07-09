@@ -206,31 +206,62 @@ exports.registerDownload = async (req, res) => {
 // Actualizar el webhook para guardar el estado del pago
 exports.handleWebhook = async (req, res) => {
   try {
-    const { action, data } = req.body;
-    
-    if (action === 'payment.updated' || action === 'payment.created') {
-      const paymentId = data.id;
-      
+    console.log('Webhook recibido:', JSON.stringify(req.body, null, 2));
+
+    const { action, data, type } = req.body;
+    let paymentId = null;
+
+    // Compatibilidad con diferentes formatos de webhook
+    if (data && data.id) {
+      paymentId = data.id;
+    } else if (req.body['data.id']) {
+      paymentId = req.body['data.id'];
+    }
+
+    if (
+      action === 'payment.updated' ||
+      action === 'payment.created' ||
+      type === 'payment' ||
+      req.body.topic === 'payment'
+    ) {
+      if (!paymentId) {
+        console.error('No se encontró paymentId en el webhook');
+        return res.status(400).json({ error: 'No paymentId in webhook' });
+      }
+
       // Obtener información detallada del pago desde MercadoPago
       const mercadopagoPayment = await mercadopago.payment.findById(paymentId);
-      
+
       if (mercadopagoPayment.body) {
         const payment = mercadopagoPayment.body;
-        
-        // Actualizar el estado del pago en nuestra base de datos
-        await Payment.update(
-          { status: payment.status },
-          { 
-            where: { 
-              mercadoPagoId: payment.id.toString() 
-            } 
+
+        // Actualizar el estado y otros campos relevantes en la base de datos
+        const [updatedRows] = await Payment.update(
+          {
+            status: payment.status,
+            status_detail: payment.status_detail,
+            payment_type_id: payment.payment_type_id,
+            payment_method_id: payment.payment_method_id,
+            payer_email: payment.payer && payment.payer.email,
+            updatedAt: new Date()
+          },
+          {
+            where: { mercadoPagoId: payment.id.toString() }
           }
         );
-        
-        console.log(`Pago ${payment.id} actualizado a estado: ${payment.status}`);
+
+        if (updatedRows > 0) {
+          console.log(`Pago ${payment.id} actualizado a estado: ${payment.status}`);
+        } else {
+          console.warn(`No se encontró el pago con mercadoPagoId: ${payment.id}`);
+        }
+      } else {
+        console.warn('No se encontró información del pago en MercadoPago');
       }
+    } else {
+      console.log('Evento ignorado por el webhook:', action || type || req.body.topic);
     }
-    
+
     return res.status(200).send('OK');
   } catch (error) {
     console.error('Error en webhook de MercadoPago:', error);
@@ -325,31 +356,62 @@ exports.registerDownload = async (req, res) => {
 // Actualizar el webhook para guardar el estado del pago
 exports.handleWebhook = async (req, res) => {
   try {
-    const { action, data } = req.body;
-    
-    if (action === 'payment.updated' || action === 'payment.created') {
-      const paymentId = data.id;
-      
+    console.log('Webhook recibido:', JSON.stringify(req.body, null, 2));
+
+    const { action, data, type } = req.body;
+    let paymentId = null;
+
+    // Compatibilidad con diferentes formatos de webhook
+    if (data && data.id) {
+      paymentId = data.id;
+    } else if (req.body['data.id']) {
+      paymentId = req.body['data.id'];
+    }
+
+    if (
+      action === 'payment.updated' ||
+      action === 'payment.created' ||
+      type === 'payment' ||
+      req.body.topic === 'payment'
+    ) {
+      if (!paymentId) {
+        console.error('No se encontró paymentId en el webhook');
+        return res.status(400).json({ error: 'No paymentId in webhook' });
+      }
+
       // Obtener información detallada del pago desde MercadoPago
       const mercadopagoPayment = await mercadopago.payment.findById(paymentId);
-      
+
       if (mercadopagoPayment.body) {
         const payment = mercadopagoPayment.body;
-        
-        // Actualizar el estado del pago en nuestra base de datos
-        await Payment.update(
-          { status: payment.status },
-          { 
-            where: { 
-              mercadoPagoId: payment.id.toString() 
-            } 
+
+        // Actualizar el estado y otros campos relevantes en la base de datos
+        const [updatedRows] = await Payment.update(
+          {
+            status: payment.status,
+            status_detail: payment.status_detail,
+            payment_type_id: payment.payment_type_id,
+            payment_method_id: payment.payment_method_id,
+            payer_email: payment.payer && payment.payer.email,
+            updatedAt: new Date()
+          },
+          {
+            where: { mercadoPagoId: payment.id.toString() }
           }
         );
-        
-        console.log(`Pago ${payment.id} actualizado a estado: ${payment.status}`);
+
+        if (updatedRows > 0) {
+          console.log(`Pago ${payment.id} actualizado a estado: ${payment.status}`);
+        } else {
+          console.warn(`No se encontró el pago con mercadoPagoId: ${payment.id}`);
+        }
+      } else {
+        console.warn('No se encontró información del pago en MercadoPago');
       }
+    } else {
+      console.log('Evento ignorado por el webhook:', action || type || req.body.topic);
     }
-    
+
     return res.status(200).send('OK');
   } catch (error) {
     console.error('Error en webhook de MercadoPago:', error);
