@@ -17,12 +17,12 @@ router.get('/webhook', mercadoPagoController.handleWebhook);
 // Obtener la clave pública
 router.get('/public-key', mercadoPagoController.getPublicKey);
 
-// Consultar el estado de un pago de usuario
+// Consultar el estado de un pago de usuario (ahora siempre es gratuito)
 router.get('/user-payment/:template', mercadoPagoController.checkUserPayment);
 router.get('/check-user-payment', mercadoPagoController.checkUserPaymentGeneral);
 router.get('/check-user-payments', protect, mercadoPagoController.checkUserPayments);
 
-// Registrar una descarga
+// Registrar una descarga (ahora siempre es exitosa)
 router.post('/register-download/:template', mercadoPagoController.registerDownload);
 router.post('/initialize-session', mercadoPagoController.initializeSession);
 

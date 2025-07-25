@@ -84,123 +84,29 @@ exports.createPreference = async (req, res) => {
   }
 };
 
-// Nuevo endpoint para verificar el estado de descargas
+// Todas las plantillas ahora son gratuitas y sin marca de agua
 exports.checkUserPayment = async (req, res) => {
-  try {
-    const { template } = req.params;
-    const sessionId = req.cookies.sessionId;
-    
-    if (!sessionId) {
-      return res.status(200).json({ hasPaid: false });
-    }
-    
-    // Buscar pago aprobado con descargas disponibles
-    const payment = await Payment.findOne({
-      where: {
-        sessionId: sessionId,
-        template: template,
-        status: 'approved',
-        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
-        // downloadsRemaining: { gt: 0 }
-      }
-    });
-    
-    return res.status(200).json({
-      hasPaid: !!payment,
-      downloadsRemaining: payment ? payment.downloadsRemaining : 0,
-      paymentInfo: payment ? {
-        id: payment.mercadoPagoId,
-        date: payment.updatedAt
-      } : null
-    });
-  } catch (error) {
-    logger.error('Error al verificar pago de usuario', error);
-    return res.status(500).json({ error: 'Error al verificar pago' });
-  }
+  return res.status(200).json({
+    hasPaid: true,
+    downloadsRemaining: Infinity,
+    paymentInfo: null
+  });
 };
 
-// Verificar pago de usuario sin especificar template
 exports.checkUserPaymentGeneral = async (req, res) => {
-  try {
-    const sessionId = req.cookies.sessionId;
-    
-    if (!sessionId) {
-      return res.status(200).json({ hasPaid: false });
-    }
-    
-    // Buscar cualquier pago aprobado con descargas disponibles
-    const payment = await Payment.findOne({
-      where: {
-        sessionId: sessionId,
-        status: 'approved',
-        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
-        // downloadsRemaining: { gt: 0 }
-      },
-      order: [['createdAt', 'DESC']]
-    });
-    
-    return res.status(200).json({
-      hasPaid: !!payment,
-      downloadsRemaining: payment ? payment.downloadsRemaining : 0,
-      template: payment ? payment.template : null,
-      paymentInfo: payment ? {
-        id: payment.mercadoPagoId,
-        date: payment.updatedAt
-      } : null
-    });
-  } catch (error) {
-    logger.error('Error al verificar pago general de usuario', error);
-    return res.status(500).json({ error: 'Error al verificar pago' });
-  }
+  return res.status(200).json({
+    hasPaid: true,
+    downloadsRemaining: Infinity,
+    template: null,
+    paymentInfo: null
+  });
 };
 
-// Nuevo endpoint para registrar una descarga
 exports.registerDownload = async (req, res) => {
-  try {
-    const { template } = req.params;
-    const sessionId = req.cookies.sessionId;
-    
-    if (!sessionId) {
-      return res.status(400).json({ error: 'No hay sesión activa' });
-    }
-    
-    // Buscar el pago más reciente con descargas disponibles
-    const payment = await Payment.findOne({
-      where: {
-        sessionId: sessionId,
-        template: template,
-        status: 'approved',
-        downloadsRemaining: { [Op.gt]: 0 } // Cambia a:
-        // downloadsRemaining: { gt: 0 }
-      },
-      order: [['createdAt', 'DESC']]
-    });
-    
-    if (!payment) {
-      return res.status(400).json({ 
-        error: 'No hay descargas disponibles',
-        requiresPayment: true
-      });
-    }
-    
-    // Decrementar contador de descargas
-    payment.downloadsRemaining -= 1;
-    await payment.save();
-    
-    logger.info('Descarga registrada', { 
-      sessionId, 
-      template, 
-      remainingDownloads: payment.downloadsRemaining 
-    });
-    
-    return res.status(200).json({
-      success: true,
-      downloadsRemaining: payment.downloadsRemaining
-    });
-  } catch (error) {
-    logger.error('Error al registrar descarga', error);
-    return res.status(500).json({ error: 'Error al registrar descarga' });
-  }
+  return res.status(200).json({
+    success: true,
+    downloadsRemaining: Infinity
+  });
 };
 
 // Actualizar el webhook para guardar el estado del pago

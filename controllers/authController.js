@@ -304,35 +304,13 @@ exports.deleteAccount = async (req, res) => {
   }
 };
 
-// Añadir este método
+// Puedes dejar los métodos de suscripción para compatibilidad, pero haz que siempre respondan como "activo"
 exports.checkSubscription = async (req, res) => {
-  try {
-    const userId = req.user.id;
-    
-    // Buscar suscripción activa
-    const subscription = await Subscription.findOne({
-      where: {
-        userId,
-        status: 'active',
-        endDate: {
-          [Op.gt]: new Date() // Fecha fin mayor que hoy
-        }
-      },
-      order: [['endDate', 'DESC']]
-    });
-    
-    // Si no hay suscripción pero el usuario es admin, considerarlo premium
-    const isPremium = !!subscription || req.user.role === 'admin';
-    
-    return res.json({
-      active: isPremium,
-      subscription: subscription || null,
-      isPremium
-    });
-  } catch (error) {
-    console.error('Error al verificar suscripción:', error);
-    return res.status(500).json({ error: 'Error al verificar suscripción' });
-  }
+  return res.json({
+    active: true,
+    subscription: null,
+    isPremium: true
+  });
 };
 
 // Añadir esta función al final del archivo

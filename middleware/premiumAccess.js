@@ -49,9 +49,11 @@ const premiumAccess = async (req, res, next) => {
         return next();
       }
     } else if (req.originalUrl.includes('cover-letters') && req.method === 'POST') {
-      // Permitir crear pero con marca de agua
-      req.watermark = true;
-      return next();
+      // Solo permitir a usuarios premium/suscripción (pack de entrevista)
+      return res.status(403).json({ 
+        error: 'Requiere suscripción premium (Pack de Entrevista)',
+        requiresPayment: true
+      });
     }
     
     return res.status(403).json({ 
